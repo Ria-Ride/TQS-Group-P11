@@ -61,7 +61,8 @@ Status legend: items marked **[TBD]** are not decided yet. Do not invent a value
 | Build                 | Maven, wrapper `./mvnw` (`mvnw.cmd` on Windows)                                     |
 | Frontend              | React + Vite + TypeScript; E2E with Playwright                                      |
 | DB                    | PostgreSQL (Testcontainers for integration tests)                                   |
-| Messaging / telemetry | Simulator behind **one port + adapter**, e.g. MQTT **[TBD]**                        |
+| Messaging / telemetry | MQTT, following the simulator contract v1.0.0 (`contract/` in the simulator repository); simulator behind **one port + adapter**; broker product **[TBD]** |
+| Telemetry simulator   | Separate repository [o-reis/tqs-telemetry-simulator](https://github.com/o-reis/tqs-telemetry-simulator): Java 21, Spring Boot, Maven, HiveMQ MQTT Client (Mosquitto in integration tests); own CI at the same level as the backend; image published to GHCR from `main` |
 | Payments              | Sandbox (e.g. Stripe test mode) or simulated gateway, behind a port + adapter       |
 | Tests                 | JUnit 5, Mockito, AssertJ, Cucumber (BDD), Testcontainers, k6 (load)                |
 | Quality               | SonarQube/SonarCloud + JaCoCo, quality gate on new code **[TBD thresholds]**        |
@@ -89,7 +90,7 @@ localDocs/                 PRIVATE, git-ignored: personal AI log, prototypes, in
 proj/
   backend/                 Spring Boot, Maven (own pom.xml, mvnw)
   frontend/                React + Vite + TypeScript
-  simulator/               fleet telemetry simulator, own Dockerfile (separate service)
+  simulator/               fleet telemetry simulator: separate repository, cloned here locally, git-ignored
   e2e/                     Playwright/Selenium tests, NOT in default build
   load/                    k6 scripts + thresholds from the SLOs
 ```
@@ -212,6 +213,7 @@ Use patterns deliberately and **name them** in the PR description/Javadoc. Good 
   - Jira key: in the branch name and in the body footer (`Jira: KAN-42`) so Jira's dev panel links it.
   - **Jira smart commits.** When proposing a commit message, advise the user to add the smart-commit command to the footer, so the Jira issue moves on its own:
     - first commit of the branch: `KAN-42 #in-progress`;
+    - last commit before opening the pull request: `KAN-42 #in-review`;
     - final commit, or the squash-merge message: `KAN-42 #done`, so the issue only closes when the PR is merged into `main`.
     - Never use `#done` on intermediate commits. Smart commits only work if the committer's `git config user.email` matches their Jira account email.
     - **If you notice the user did not follow these rules, warn them.** For example: a branch, commit or PR without the Jira key; `#done` on an intermediate commit; no `#in-progress` on the first commit; a squash-merge message without `#done`; a committer email that does not match Jira. Say what is wrong and suggest the fix (e.g. amend the last commit, edit the squash message), but do not rewrite history or push without asking (1.1).

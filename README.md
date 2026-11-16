@@ -1,7 +1,6 @@
 # TQS-Group-P11 — [Product name]
 
-![CI](https://github.com/Ad-Qualquer-Coisa/TQS-Group-P11/actions/workflows/ci.yml/badge.svg)
-<!-- Badge activates once the CI workflow (ci.yml) is added. -->
+[![CI](https://github.com/Ria-Ride/TQS-Group-P11/actions/workflows/ci.yml/badge.svg)](https://github.com/Ria-Ride/TQS-Group-P11/actions/workflows/ci.yml)
 
 ## 1. Project abstract
 
@@ -32,7 +31,7 @@ Roles: Team Coordinator, Product Owner, QA Engineer, DevOps Master. Every member
 | Resource                         | Link |
 |----------------------------------|------|
 | Jira backlog                     | [Click here](https://tqs-group11.atlassian.net/jira/software/projects/KAN/boards/1/backlog) |
-| Related repositories             | [TBD — none yet] |
+| Related repositories             | [Fleet telemetry simulator](https://github.com/o-reis/tqs-telemetry-simulator) (own CI, image on GHCR) |
 | API documentation (OpenAPI/Swagger) | [TBD] |
 | Static analysis dashboard (SonarQube) | [Click here](https://sonarcloud.io/project/overview?id=Ad-Qualquer-Coisa_TQS-Group-P11) |
 | Observability dashboard (Grafana)   | [TBD] |
@@ -51,7 +50,7 @@ docker-compose.yml   whole stack as code: backend, frontend, PostgreSQL
 .env.example         variable names for .env (copy, then set the values)
 proj/backend/        Spring Boot (Java 21) backend
 proj/frontend/       web UI (React, Vite, TypeScript; nginx in the container)
-proj/simulator/      fleet telemetry simulator (separate container)
+proj/simulator/      fleet telemetry simulator: separate repository, cloned here, git-ignored
 ```
 
 ## Running locally
@@ -66,6 +65,13 @@ docker compose up --build     # backend, frontend and PostgreSQL
 Open http://localhost (or the `FRONTEND_PORT` set in `.env`). The page shows `Backend status: UP` when the
 frontend reaches the backend and the backend reaches the database. `docker compose down` stops the
 stack and keeps the data; `docker compose down -v` also deletes the database volume.
+
+To work on the fleet telemetry simulator, clone its repository into `proj/simulator` (that folder
+is git-ignored here, so the two repositories stay separate):
+
+```bash
+git clone https://github.com/o-reis/tqs-telemetry-simulator.git proj/simulator
+```
 
 ## Contributing
 
