@@ -10,6 +10,7 @@ import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
 import pt.ua.deti.tqs.p11.application.auth.AccessTokenService;
 import pt.ua.deti.tqs.p11.application.auth.LoginUseCase;
 import pt.ua.deti.tqs.p11.application.auth.RegisterGuestUseCase;
+import pt.ua.deti.tqs.p11.application.user.GetUserProfileUseCase;
 import pt.ua.deti.tqs.p11.application.user.PasswordHasher;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
 
@@ -23,8 +24,9 @@ class AuthConfiguration {
     return Clock.systemUTC();
   }
 
+  /** Concrete type so the security filter can reuse its decoder; injected as AccessTokenService. */
   @Bean
-  AccessTokenService accessTokenService(JwtProperties jwt, Clock clock) {
+  JwtTokenService accessTokenService(JwtProperties jwt, Clock clock) {
     return new JwtTokenService(jwt.secret(), jwt.timeToLive(), clock);
   }
 
@@ -43,5 +45,10 @@ class AuthConfiguration {
   LoginUseCase loginUseCase(
       UserRepository users, PasswordHasher passwordHasher, AccessTokenService tokens) {
     return new LoginUseCase(users, passwordHasher, tokens);
+  }
+
+  @Bean
+  GetUserProfileUseCase getUserProfileUseCase(UserRepository users) {
+    return new GetUserProfileUseCase(users);
   }
 }

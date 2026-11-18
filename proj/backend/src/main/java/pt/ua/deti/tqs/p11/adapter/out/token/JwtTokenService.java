@@ -31,7 +31,7 @@ public class JwtTokenService implements AccessTokenService {
   /** HS256 needs a key of at least 256 bits. */
   static final int MIN_SECRET_BYTES = 32;
 
-  static final String ROLE_CLAIM = "role";
+  public static final String ROLE_CLAIM = "role";
 
   private final JwtEncoder encoder;
   private final JwtDecoder decoder;
@@ -89,7 +89,6 @@ public class JwtTokenService implements AccessTokenService {
 
   /** Decoder with the same key and rules, used by the security filter (US13). */
   public JwtDecoder jwtDecoder() {
-    throw new UnsupportedOperationException("not implemented yet");
+    return decoder;
   }
-
 }

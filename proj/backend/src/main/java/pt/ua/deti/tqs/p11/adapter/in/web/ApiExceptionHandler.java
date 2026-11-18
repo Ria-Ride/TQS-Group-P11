@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.auth.InvalidCredentialsException;
+import pt.ua.deti.tqs.p11.application.user.UserNotFoundException;
 
 /**
  * Maps exceptions to HTTP responses in one place (RFC 9457 problem details). Every error carries an
@@ -41,5 +42,10 @@ class ApiExceptionHandler {
   @ExceptionHandler(InvalidCredentialsException.class)
   ProblemDetail invalidCredentials(InvalidCredentialsException e) {
     return problem(HttpStatus.UNAUTHORIZED, e.getMessage(), Map.of());
+  }
+
+  @ExceptionHandler(UserNotFoundException.class)
+  ProblemDetail userNotFound(UserNotFoundException e) {
+    return problem(HttpStatus.NOT_FOUND, e.getMessage(), Map.of());
   }
 }

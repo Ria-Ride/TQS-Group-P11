@@ -65,12 +65,11 @@ class OwnDataAccessApiIT {
   private ResponseEntity<Map<String, Object>> getUser(UUID id, String token) {
     return http.get()
         .uri("/users/{id}", id)
-        .headers(
-            headers -> {
-              if (token != null) {
-                headers.setBearerAuth(token);
-              }
-            })
+        .headers(headers -> {
+          if (token != null) {
+            headers.setBearerAuth(token);
+          }
+        })
         .retrieve()
         .toEntity(ApiClient.JSON_OBJECT);
   }
@@ -107,7 +106,8 @@ class OwnDataAccessApiIT {
   @Test
   void tokenSignedWithAnotherKey_returns401() {
     String foreign =
-        new JwtTokenService("other-test-secret-0123456789abcd", Duration.ofHours(1), Clock.systemUTC())
+        new JwtTokenService(
+                "other-test-secret-0123456789abcd", Duration.ofHours(1), Clock.systemUTC())
             .issue(ana.id(), Role.END_USER);
 
     assertThat(getUser(ana.id(), foreign).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

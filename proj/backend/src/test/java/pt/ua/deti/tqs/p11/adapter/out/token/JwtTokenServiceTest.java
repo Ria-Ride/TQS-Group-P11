@@ -16,7 +16,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
-
 import pt.ua.deti.tqs.p11.application.auth.TokenClaims;
 import pt.ua.deti.tqs.p11.domain.user.Role;
 

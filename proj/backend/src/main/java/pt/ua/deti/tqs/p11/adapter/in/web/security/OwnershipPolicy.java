@@ -12,6 +12,9 @@ import org.springframework.stereotype.Component;
 public class OwnershipPolicy {
 
   public boolean isSelf(UUID userId, Authentication authentication) {
-    throw new UnsupportedOperationException("not implemented yet");
+    // With a JWT, the authentication name is the token's subject: the user id.
+    return authentication != null
+        && authentication.isAuthenticated()
+        && userId.toString().equals(authentication.getName());
   }
 }
