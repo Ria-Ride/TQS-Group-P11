@@ -9,7 +9,6 @@ import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.Assumptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -149,26 +148,29 @@ public class GuestAccountSteps {
 
   @When("the tourist requests the data of the account with email {string}")
   public void theTouristRequestsTheDataOf(String email) {
-    pending();
+    UUID id =
+        jdbc.queryForObject(
+            "SELECT id FROM users WHERE email = ?", UUID.class, new EmailAddress(email).value());
+    lastResponse =
+        http.get()
+            .uri("/users/{id}", id)
+            .headers(headers -> headers.setBearerAuth(accessToken))
+            .retrieve()
+            .toEntity(ApiClient.JSON_OBJECT);
   }
 
   @Then("access is granted")
   public void accessIsGranted() {
-    pending();
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
   }
 
   @Then("access is denied")
   public void accessIsDenied() {
-    pending();
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
   }
 
   @Then("the data shows name {string} and email {string}")
   public void theDataShows(String name, String email) {
-    pending();
-  }
-
-  /** Marks a step as not implemented yet: the scenario is reported as skipped, not failed. */
-  private static void pending() {
-    Assumptions.abort("Pending: step not implemented yet (KAN-53)");
+    assertThat(lastResponse.getBody()).containsEntry("name", name).containsEntry("email", email);
   }
 }
