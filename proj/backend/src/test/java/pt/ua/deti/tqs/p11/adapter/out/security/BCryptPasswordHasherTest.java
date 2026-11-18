@@ -23,4 +23,18 @@ class BCryptPasswordHasherTest {
   void hash_samePasswordTwice_givesDifferentHashes() {
     assertThat(hasher.hash(PASSWORD)).isNotEqualTo(hasher.hash(PASSWORD));
   }
+
+  @Test
+  void matches_correctPassword_isTrue() {
+    String hash = new BCryptPasswordEncoder().encode(PASSWORD);
+
+    assertThat(hasher.matches(PASSWORD, hash)).isTrue();
+  }
+
+  @Test
+  void matches_wrongPassword_isFalse() {
+    String hash = new BCryptPasswordEncoder().encode(PASSWORD);
+
+    assertThat(hasher.matches("WrongPass1!", hash)).isFalse();
+  }
 }

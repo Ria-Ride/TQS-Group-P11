@@ -62,4 +62,17 @@ class UserPersistenceAdapterIT {
     // Bypasses existsByEmail, as two concurrent registrations would.
     assertThatThrownBy(() -> users.save(sameEmail)).isInstanceOf(EmailAlreadyInUseException.class);
   }
+
+  @Test
+  void findByEmail_returnsTheStoredUser() {
+    User ana = User.guest(ANA_ID, "Ana Sousa", ANA_EMAIL, "hashed-password");
+    users.save(ana);
+
+    assertThat(users.findByEmail(ANA_EMAIL)).contains(ana);
+  }
+
+  @Test
+  void findByEmail_unknownAddress_isEmpty() {
+    assertThat(users.findByEmail(new EmailAddress("bruno.lima@example.com"))).isEmpty();
+  }
 }

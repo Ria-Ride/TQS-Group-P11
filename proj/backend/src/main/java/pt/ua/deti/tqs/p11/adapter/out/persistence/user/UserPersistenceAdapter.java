@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.adapter.out.persistence.user;
 
+import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
@@ -41,5 +42,10 @@ class UserPersistenceAdapter implements UserRepository {
   private static boolean isEmailConflict(DataIntegrityViolationException e) {
     String cause = e.getMostSpecificCause().getMessage();
     return cause != null && cause.contains(EMAIL_UNIQUE_CONSTRAINT);
+  }
+
+  @Override
+  public Optional<User> findByEmail(EmailAddress email) {
+    throw new UnsupportedOperationException("not implemented yet");
   }
 }
