@@ -18,5 +18,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     restoreMocks: true,
+    // Mocked API functions start every test with no programmed answer.
+    mockReset: true,
   },
 });
