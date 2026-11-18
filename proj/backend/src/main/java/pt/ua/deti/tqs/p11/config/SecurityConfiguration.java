@@ -11,18 +11,21 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import pt.ua.deti.tqs.p11.adapter.in.web.security.SecurityProblemHandler;
 import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
 
 /**
- * Minimal API security for US01: stateless bearer tokens, public auth endpoints, everything else
- * authenticated. US13 extends it with the role x endpoint matrix and consistent 401/403 bodies.
+ * API security (US13): stateless bearer tokens and the BR23 role x endpoint rules from the access
+ * matrix (src/test/resources/security/access-matrix.csv). Anything not listed is denied, so a new
+ * endpoint is closed until its row is added. 401 and 403 get the same problem body as other errors.
  */
 @Configuration
 @EnableMethodSecurity
 class SecurityConfiguration {
 
   @Bean
-  SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
+  SecurityFilterChain apiSecurity(HttpSecurity http, SecurityProblemHandler problems)
+      throws Exception {
     http
         // Tokens travel in a header, never in a cookie, so CSRF does not apply.
         .csrf(AbstractHttpConfigurer::disable)
@@ -37,10 +40,22 @@ class SecurityConfiguration {
                 // Errors such as malformed JSON are forwarded to /error; keep their status.
                 .requestMatchers("/error")
                 .permitAll()
+                // Ownership of /users/{id} is checked by @PreAuthorize (OwnershipPolicy).
+                .requestMatchers(HttpMethod.GET, "/users/me", "/users/{id}")
+                .authenticated()
+                .requestMatchers("/admin/**")
+                .hasRole("ADMIN")
                 .anyRequest()
-                .authenticated())
-        .oauth2ResourceServer(
-            server -> server.jwt(jwt -> jwt.jwtAuthenticationConverter(roleClaimConverter())));
+                .denyAll())
+        // No token at all, or a role without permission.
+        .exceptionHandling(
+            errors -> errors.authenticationEntryPoint(problems).accessDeniedHandler(problems))
+        // An invalid or expired token is rejected by the bearer token filter, which has its own.
+        .oauth2ResourceServer(server ->
+            server
+                .authenticationEntryPoint(problems)
+                .accessDeniedHandler(problems)
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(roleClaimConverter())));
     return http.build();
   }
 

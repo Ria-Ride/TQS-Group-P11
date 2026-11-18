@@ -2,8 +2,12 @@ package pt.ua.deti.tqs.p11.adapter.in.web;
 
 import java.util.Map;
 import java.util.TreeMap;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,5 +51,23 @@ class ApiExceptionHandler {
   @ExceptionHandler(UserNotFoundException.class)
   ProblemDetail userNotFound(UserNotFoundException e) {
     return problem(HttpStatus.NOT_FOUND, e.getMessage(), Map.of());
+  }
+
+  /**
+   * Missing, invalid or expired token (US13). One detail for every case, so the client is not told
+   * why the token was refused. The Bearer challenge follows RFC 6750.
+   */
+  @ExceptionHandler(AuthenticationException.class)
+  ResponseEntity<ProblemDetail> unauthenticated(AuthenticationException e) {
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+        .body(problem(HttpStatus.UNAUTHORIZED, "A valid access token is required", Map.of()));
+  }
+
+  /** Valid token, but not allowed by the access matrix or the ownership policy (BR23). */
+  @ExceptionHandler(AccessDeniedException.class)
+  ProblemDetail accessDenied(AccessDeniedException e) {
+    return problem(
+        HttpStatus.FORBIDDEN, "You do not have permission to access this resource", Map.of());
   }
 }
