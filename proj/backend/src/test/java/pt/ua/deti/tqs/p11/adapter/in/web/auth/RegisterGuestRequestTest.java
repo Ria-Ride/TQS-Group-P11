@@ -104,7 +104,7 @@ class RegisterGuestRequestTest {
     assertThat(invalidFields(new RegisterGuestRequest(NAME, EMAIL, "x".repeat(length)))).isEmpty();
   }
 
-@Test
+  @Test
   void password_with72BytesOfAccentedLetters_isValid() {
     // "ã" takes 2 bytes in UTF-8: 36 characters = 72 bytes.
     assertThat(invalidFields(new RegisterGuestRequest(NAME, EMAIL, "ã".repeat(36)))).isEmpty();
