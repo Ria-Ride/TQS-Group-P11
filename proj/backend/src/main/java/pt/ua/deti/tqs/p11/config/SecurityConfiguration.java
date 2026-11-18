@@ -8,9 +8,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import pt.ua.deti.tqs.p11.adapter.in.web.security.ActiveAccountAuthenticationConverter;
 import pt.ua.deti.tqs.p11.adapter.in.web.security.SecurityProblemHandler;
 import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
 
@@ -24,7 +23,10 @@ import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
 class SecurityConfiguration {
 
   @Bean
-  SecurityFilterChain apiSecurity(HttpSecurity http, SecurityProblemHandler problems)
+  SecurityFilterChain apiSecurity(
+      HttpSecurity http,
+      SecurityProblemHandler problems,
+      ActiveAccountAuthenticationConverter activeAccounts)
       throws Exception {
     http
         // Tokens travel in a header, never in a cookie, so CSRF does not apply.
@@ -55,7 +57,8 @@ class SecurityConfiguration {
             server
                 .authenticationEntryPoint(problems)
                 .accessDeniedHandler(problems)
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(roleClaimConverter())));
+                // The account (status and role) is read from the database on every request.
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(activeAccounts)));
     return http.build();
   }
 
@@ -63,15 +66,5 @@ class SecurityConfiguration {
   @Bean
   JwtDecoder jwtDecoder(JwtTokenService tokens) {
     return tokens.jwtDecoder();
-  }
-
-  /** Turns the "role" claim into a Spring authority, e.g. END_USER becomes ROLE_END_USER. */
-  private static JwtAuthenticationConverter roleClaimConverter() {
-    JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
-    authorities.setAuthoritiesClaimName(JwtTokenService.ROLE_CLAIM);
-    authorities.setAuthorityPrefix("ROLE_");
-    JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-    converter.setJwtGrantedAuthoritiesConverter(authorities);
-    return converter;
   }
 }
