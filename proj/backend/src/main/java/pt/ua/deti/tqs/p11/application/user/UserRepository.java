@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.application.user;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import pt.ua.deti.tqs.p11.domain.user.EmailAddress;
@@ -15,4 +16,6 @@ public interface UserRepository {
   User save(User user);
 
   Optional<User> findById(UUID id);
+
+  List<User> findAll();
 }
