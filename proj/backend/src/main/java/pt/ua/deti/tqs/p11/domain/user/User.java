@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * A platform account. The password is only ever kept as a hash. Immutable: every change returns a
- * new User.
+ * new User, and the constructor checks the rules, so an invalid User cannot exist.
  */
 public record User(
     UUID id,
@@ -22,6 +22,9 @@ public record User(
     Objects.requireNonNull(email, "email");
     Objects.requireNonNull(passwordHash, "passwordHash");
     Objects.requireNonNull(role, "role");
+    if (fieldTechnician && role != Role.OPERATOR) {
+      throw new IllegalArgumentException("Only an OPERATOR can be a field technician (BR20)");
+    }
   }
 
   /** A guest account (BR10): no institutional identity, always END_USER. */
@@ -40,24 +43,44 @@ public record User(
     return new User(id, name, email, passwordHash, role, fieldTechnician, true);
   }
 
-  // KAN-77 red step: not implemented yet.
+  /**
+   * Gives the account a new role and technician flag. Admins are managed in the database only, so
+   * an admin's role cannot be changed and no one can be made an admin here.
+   */
   public User changeRole(Role newRole, boolean newFieldTechnician) {
-    return this;
+    if (role == Role.ADMIN || newRole == Role.ADMIN) {
+      throw new ProtectedAccountException("Admin roles are managed directly in the database");
+    }
+    return new User(id, name, email, passwordHash, newRole, newFieldTechnician, active);
   }
 
-  // KAN-77 red step: not implemented yet.
+  /** A deactivated account can no longer log in or use its tokens. Admins cannot be deactivated. */
   public User deactivate() {
-    return this;
+    if (role == Role.ADMIN) {
+      throw new ProtectedAccountException("Admin accounts cannot be deactivated");
+    }
+    return new User(id, name, email, passwordHash, role, fieldTechnician, false);
   }
 
-  // KAN-77 red step: not implemented yet.
   public User activate() {
-    return this;
+    return new User(id, name, email, passwordHash, role, fieldTechnician, true);
   }
 
   /** Keeps the password hash out of logs and error messages. */
   @Override
   public String toString() {
-    return "User[id=" + id + ", name=" + name + ", email=" + email.value() + ", role=" + role + "]";
+    return "User[id="
+        + id
+        + ", name="
+        + name
+        + ", email="
+        + email.value()
+        + ", role="
+        + role
+        + ", fieldTechnician="
+        + fieldTechnician
+        + ", active="
+        + active
+        + "]";
   }
 }
