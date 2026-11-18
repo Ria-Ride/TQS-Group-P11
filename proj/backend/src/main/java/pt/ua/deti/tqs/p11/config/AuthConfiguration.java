@@ -10,6 +10,7 @@ import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
 import pt.ua.deti.tqs.p11.application.auth.AccessTokenService;
 import pt.ua.deti.tqs.p11.application.auth.LoginUseCase;
 import pt.ua.deti.tqs.p11.application.auth.RegisterGuestUseCase;
+import pt.ua.deti.tqs.p11.application.user.AccountAdministrationUseCase;
 import pt.ua.deti.tqs.p11.application.user.GetUserProfileUseCase;
 import pt.ua.deti.tqs.p11.application.user.PasswordHasher;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
@@ -50,5 +51,11 @@ class AuthConfiguration {
   @Bean
   GetUserProfileUseCase getUserProfileUseCase(UserRepository users) {
     return new GetUserProfileUseCase(users);
+  }
+
+  @Bean
+  AccountAdministrationUseCase accountAdministrationUseCase(
+      UserRepository users, PasswordHasher passwordHasher) {
+    return new AccountAdministrationUseCase(users, passwordHasher, UUID::randomUUID);
   }
 }

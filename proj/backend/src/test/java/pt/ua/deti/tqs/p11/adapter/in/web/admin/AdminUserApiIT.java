@@ -221,6 +221,8 @@ class AdminUserApiIT {
             Map.of("role", "OPERATOR"));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    // Our problem body, not the 404 of a path that has no endpoint.
+    assertThat(response.getBody()).containsKey("errors");
   }
 
   // Status

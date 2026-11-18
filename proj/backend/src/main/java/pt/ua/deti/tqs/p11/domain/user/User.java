@@ -23,7 +23,7 @@ public record User(
     Objects.requireNonNull(passwordHash, "passwordHash");
     Objects.requireNonNull(role, "role");
     if (fieldTechnician && role != Role.OPERATOR) {
-      throw new IllegalArgumentException("Only an OPERATOR can be a field technician (BR20)");
+      throw new FieldTechnicianRequiresOperatorException();
     }
   }
 

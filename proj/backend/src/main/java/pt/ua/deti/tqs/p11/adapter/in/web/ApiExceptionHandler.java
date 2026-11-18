@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.auth.InvalidCredentialsException;
 import pt.ua.deti.tqs.p11.application.user.UserNotFoundException;
+import pt.ua.deti.tqs.p11.domain.user.FieldTechnicianRequiresOperatorException;
+import pt.ua.deti.tqs.p11.domain.user.ProtectedAccountException;
 
 /**
  * Maps exceptions to HTTP responses in one place (RFC 9457 problem details). Every error carries an
@@ -69,5 +71,20 @@ class ApiExceptionHandler {
   ProblemDetail accessDenied(AccessDeniedException e) {
     return problem(
         HttpStatus.FORBIDDEN, "You do not have permission to access this resource", Map.of());
+  }
+
+  /** Admin accounts are managed in the database (US13): the request conflicts with that. */
+  @ExceptionHandler(ProtectedAccountException.class)
+  ProblemDetail protectedAccount(ProtectedAccountException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of());
+  }
+
+  /** BR20, reported on the field like the other validation errors. */
+  @ExceptionHandler(FieldTechnicianRequiresOperatorException.class)
+  ProblemDetail fieldTechnicianRequiresOperator(FieldTechnicianRequiresOperatorException e) {
+    return problem(
+        HttpStatus.BAD_REQUEST,
+        "The request has invalid fields",
+        Map.of("fieldTechnician", e.getMessage()));
   }
 }
