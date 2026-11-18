@@ -1,66 +1,154 @@
 package pt.ua.deti.tqs.p11.application.user;
 
-import java.util.List;
-import java.util.Objects;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.AdditionalAnswers.returnsFirstArg;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Supplier;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.domain.user.EmailAddress;
 import pt.ua.deti.tqs.p11.domain.user.ProtectedAccountException;
 import pt.ua.deti.tqs.p11.domain.user.Role;
 import pt.ua.deti.tqs.p11.domain.user.User;
 
-/**
- * What a platform admin can do with accounts (US13): create, list, change role, (de)activate. One
- * class for the four, as they share the actor and the dependencies. The rules on admin accounts
- * and on the technician flag (BR20) live in User; this class loads, applies and saves.
- */
-public class AccountAdministrationUseCaseTest {
+@ExtendWith(MockitoExtension.class)
+class AccountAdministrationUseCaseTest {
 
-  private final UserRepository users;
-  private final PasswordHasher passwordHasher;
-  private final Supplier<UUID> idGenerator;
+  private static final UUID NEW_ID = UUID.fromString("7a3e4f5d-6c7b-4180-8c9d-1e2f3a4b5c6d");
+  private static final EmailAddress JOANA_EMAIL = new EmailAddress("joana.silva@example.com");
 
-  public AccountAdministrationUseCaseTest(
-      UserRepository users, PasswordHasher passwordHasher, Supplier<UUID> idGenerator) {
-    this.users = Objects.requireNonNull(users, "users");
-    this.passwordHasher = Objects.requireNonNull(passwordHasher, "passwordHasher");
-    this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator");
+  private static final UUID RUI_ID = UUID.fromString("6f2d3e4c-5b6a-4079-9b8c-0d1e2f3a4b5c");
+  private static final EmailAddress RUI_EMAIL = new EmailAddress("rui.costa@example.com");
+  private static final User RUI =
+      User.account(RUI_ID, "Rui Costa", RUI_EMAIL, "rui-hash", Role.OPERATOR, false);
+
+  private static final UUID MARTA_ID = UUID.fromString("8b4f5a6e-7d8c-4291-9dae-2f3a4b5c6d7e");
+  private static final User MARTA_ADMIN =
+      User.account(
+          MARTA_ID,
+          "Marta Reis",
+          new EmailAddress("marta.reis@example.com"),
+          "marta-hash",
+          Role.ADMIN,
+          false);
+
+  @Mock private UserRepository users;
+  @Mock private PasswordHasher passwordHasher;
+
+  private AccountAdministrationUseCase useCase;
+
+  @BeforeEach
+  void setUp() {
+    useCase = new AccountAdministrationUseCase(users, passwordHasher, () -> NEW_ID);
   }
 
-  /** Creates an active account with any role but ADMIN (admins are made only in the database). */
-  public User create(CreateAccountCommand command) {
-    if (command.role() == Role.ADMIN) {
-      throw new ProtectedAccountException("Admin accounts are created directly in the database");
-    }
-    EmailAddress email = new EmailAddress(command.email());
-    if (users.existsByEmail(email)) {
-      throw new EmailAlreadyInUseException();
-    }
-    return users.save(
-        User.account(
-            idGenerator.get(),
-            command.name(),
-            email,
-            passwordHasher.hash(command.password()),
-            command.role(),
-            command.fieldTechnician()));
+  /** The repository stores what it gets and hands it back, like the real one. */
+  private void saveReturnsWhatItGets() {
+    when(users.save(any(User.class))).then(returnsFirstArg());
   }
 
-  public List<User> list() {
-    return users.findAll();
+  private static CreateAccountCommand joana(Role role, boolean fieldTechnician) {
+    return new CreateAccountCommand(
+        "Joana Silva", JOANA_EMAIL.value(), "Passw0rd!", role, fieldTechnician);
   }
 
-  public User changeRole(UUID id, Role role, boolean fieldTechnician) {
-    return users.save(find(id).changeRole(role, fieldTechnician));
+  @Test
+  void create_operatorAsFieldTechnician_savesAnActiveAccountWithTheHashedPassword() {
+    when(users.existsByEmail(JOANA_EMAIL)).thenReturn(false);
+    when(passwordHasher.hash("Passw0rd!")).thenReturn("joana-hash");
+    saveReturnsWhatItGets();
+
+    assertThat(useCase.create(joana(Role.OPERATOR, true)))
+        .isEqualTo(
+            new User(NEW_ID, "Joana Silva", JOANA_EMAIL, "joana-hash", Role.OPERATOR, true, true));
   }
 
-  public User setActive(UUID id, boolean active) {
-    User user = find(id);
-    return users.save(active ? user.activate() : user.deactivate());
+  @Test
+  void create_emailAlreadyInUse_isRefusedAndNothingIsSaved() {
+    when(users.existsByEmail(JOANA_EMAIL)).thenReturn(true);
+
+    assertThatThrownBy(() -> useCase.create(joana(Role.OPERATOR, false)))
+        .isInstanceOf(EmailAlreadyInUseException.class);
+    verify(users, never()).save(any());
   }
 
-  private User find(UUID id) {
-    return users.findById(id).orElseThrow(UserNotFoundException::new);
+  /** Admins are created only by the seed or in the database. */
+  @Test
+  void create_admin_isRefusedAndNothingIsSaved() {
+    assertThatThrownBy(() -> useCase.create(joana(Role.ADMIN, false)))
+        .isInstanceOf(ProtectedAccountException.class);
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void changeRole_operatorToClientManager_savesTheNewRole() {
+    when(users.findById(RUI_ID)).thenReturn(Optional.of(RUI));
+    saveReturnsWhatItGets();
+
+    assertThat(useCase.changeRole(RUI_ID, Role.CLIENT_MANAGER, false))
+        .isEqualTo(
+            new User(RUI_ID, "Rui Costa", RUI_EMAIL, "rui-hash", Role.CLIENT_MANAGER, false, true));
+  }
+
+  @Test
+  void changeRole_unknownAccount_isNotFound() {
+    when(users.findById(RUI_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> useCase.changeRole(RUI_ID, Role.CLIENT_MANAGER, false))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
+  void changeRole_ofAnAdmin_isRefusedAndNothingIsSaved() {
+    when(users.findById(MARTA_ID)).thenReturn(Optional.of(MARTA_ADMIN));
+
+    assertThatThrownBy(() -> useCase.changeRole(MARTA_ID, Role.OPERATOR, false))
+        .isInstanceOf(ProtectedAccountException.class);
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void setActive_false_savesTheAccountDeactivated() {
+    when(users.findById(RUI_ID)).thenReturn(Optional.of(RUI));
+    saveReturnsWhatItGets();
+
+    assertThat(useCase.setActive(RUI_ID, false))
+        .isEqualTo(
+            new User(RUI_ID, "Rui Costa", RUI_EMAIL, "rui-hash", Role.OPERATOR, false, false));
+  }
+
+  @Test
+  void setActive_true_savesTheAccountReactivated() {
+    when(users.findById(RUI_ID)).thenReturn(Optional.of(RUI.deactivate()));
+    saveReturnsWhatItGets();
+
+    assertThat(useCase.setActive(RUI_ID, true)).isEqualTo(RUI);
+  }
+
+  @Test
+  void setActive_unknownAccount_isNotFound() {
+    when(users.findById(RUI_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> useCase.setActive(RUI_ID, false))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
+  void setActive_falseOnAnAdmin_isRefusedAndNothingIsSaved() {
+    when(users.findById(MARTA_ID)).thenReturn(Optional.of(MARTA_ADMIN));
+
+    assertThatThrownBy(() -> useCase.setActive(MARTA_ID, false))
+        .isInstanceOf(ProtectedAccountException.class);
+    verify(users, never()).save(any());
   }
 }
