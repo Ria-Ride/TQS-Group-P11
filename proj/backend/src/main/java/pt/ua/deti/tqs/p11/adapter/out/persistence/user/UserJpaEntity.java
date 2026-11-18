@@ -45,6 +45,6 @@ class UserJpaEntity {
   }
 
   User toDomain() {
-    return new User(id, name, new EmailAddress(email), passwordHash, role);
+    return User.account(id, name, new EmailAddress(email), passwordHash, role, false);
   }
 }

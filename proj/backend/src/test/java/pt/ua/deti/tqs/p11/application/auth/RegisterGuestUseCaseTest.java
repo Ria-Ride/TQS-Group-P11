@@ -50,12 +50,13 @@ class RegisterGuestUseCaseTest {
     verify(users).save(saved.capture());
     assertThat(saved.getValue())
         .isEqualTo(
-            new User(
+            User.account(
                 NEW_ID,
                 "Ana Sousa",
                 new EmailAddress("ana.sousa@example.com"),
                 "hashed-password",
-                Role.END_USER));
+                Role.END_USER,
+                false));
   }
 
   @Test
