@@ -7,7 +7,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,6 +26,7 @@ import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
 import pt.ua.deti.tqs.p11.config.JwtProperties;
 import pt.ua.deti.tqs.p11.domain.user.Role;
 import pt.ua.deti.tqs.p11.support.ApiClient;
+import pt.ua.deti.tqs.p11.support.ApiClient.Registered;
 
 /**
  * US13 (KAN-75): 401 and 403 carry the same problem-details body as every other API error, and a
@@ -35,9 +35,6 @@ import pt.ua.deti.tqs.p11.support.ApiClient;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
 class SecurityErrorsApiIT {
-
-  private record Registered(UUID id, String token) {}
-
   /** Ways a bearer token can be wrong; all must look the same to the client. */
   enum InvalidToken {
     MALFORMED,
@@ -59,21 +56,8 @@ class SecurityErrorsApiIT {
   void registerTwoTourists() {
     jdbc.update("DELETE FROM users");
     http = ApiClient.forPort(port);
-    ana = register("Ana Sousa", "ana.sousa@example.com", "Passw0rd!");
-    bruno = register("Bruno Lima", "bruno.lima@example.com", "Secr3t!xy");
-  }
-
-  private Registered register(String name, String email, String password) {
-    Map<String, Object> body =
-        http.post()
-            .uri("/auth/guest")
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of("name", name, "email", email, "password", password))
-            .retrieve()
-            .toEntity(ApiClient.JSON_OBJECT)
-            .getBody();
-    return new Registered(
-        UUID.fromString((String) body.get("userId")), (String) body.get("accessToken"));
+    ana = ApiClient.registerGuest(http, "Ana Sousa", "ana.sousa@example.com", "Passw0rd!");
+    bruno = ApiClient.registerGuest(http, "Bruno Lima", "bruno.lima@example.com", "Secr3t!xy");
   }
 
   private ResponseEntity<Map<String, Object>> get(String uri, String token) {

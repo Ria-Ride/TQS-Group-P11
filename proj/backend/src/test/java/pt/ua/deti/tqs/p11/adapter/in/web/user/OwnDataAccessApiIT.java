@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestClient;
@@ -24,12 +23,11 @@ import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
 import pt.ua.deti.tqs.p11.config.JwtProperties;
 import pt.ua.deti.tqs.p11.domain.user.Role;
 import pt.ua.deti.tqs.p11.support.ApiClient;
+import pt.ua.deti.tqs.p11.support.ApiClient.Registered;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
 class OwnDataAccessApiIT {
-
-  private record Registered(UUID id, String token) {}
 
   @Value("${local.server.port}")
   private int port;
@@ -45,21 +43,8 @@ class OwnDataAccessApiIT {
   void registerTwoTourists() {
     jdbc.update("DELETE FROM users");
     http = ApiClient.forPort(port);
-    ana = register("Ana Sousa", "ana.sousa@example.com", "Passw0rd!");
-    bruno = register("Bruno Lima", "bruno.lima@example.com", "Secr3t!xy");
-  }
-
-  private Registered register(String name, String email, String password) {
-    Map<String, Object> body =
-        http.post()
-            .uri("/auth/guest")
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of("name", name, "email", email, "password", password))
-            .retrieve()
-            .toEntity(ApiClient.JSON_OBJECT)
-            .getBody();
-    return new Registered(
-        UUID.fromString((String) body.get("userId")), (String) body.get("accessToken"));
+    ana = ApiClient.registerGuest(http, "Ana Sousa", "ana.sousa@example.com", "Passw0rd!");
+    bruno = ApiClient.registerGuest(http, "Bruno Lima", "bruno.lima@example.com", "Secr3t!xy");
   }
 
   private ResponseEntity<Map<String, Object>> getUser(UUID id, String token) {
