@@ -21,14 +21,15 @@ public class LoginUseCase {
   }
 
   /**
-   * Unknown e-mail and wrong password give the same exception, so the response does not reveal
-   * which e-mails have an account.
+   * Unknown e-mail, wrong password and deactivated account give the same exception, so the response
+   * does not reveal which e-mails have an account or whether it is active.
    */
   public AccessGrant login(LoginCommand command) {
     User user =
         users
             .findByEmail(new EmailAddress(command.email()))
             .filter(found -> passwordHasher.matches(command.password(), found.passwordHash()))
+            .filter(User::active)
             .orElseThrow(InvalidCredentialsException::new);
     return new AccessGrant(user.id(), tokens.issue(user.id(), user.role()));
   }
