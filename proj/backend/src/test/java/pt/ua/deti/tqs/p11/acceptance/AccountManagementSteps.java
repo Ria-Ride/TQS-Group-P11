@@ -59,12 +59,11 @@ public class AccountManagementSteps {
         http()
             .method(method)
             .uri(path)
-            .headers(
-                headers -> {
-                  if (token != null) {
-                    headers.setBearerAuth(token);
-                  }
-                });
+            .headers(headers -> {
+              if (token != null) {
+                headers.setBearerAuth(token);
+              }
+            });
     if (body != null) {
       request.contentType(MediaType.APPLICATION_JSON).body(body);
     }
@@ -144,10 +143,7 @@ public class AccountManagementSteps {
   public void loggingInIsRefused(String email, String password) {
     assertThat(
             send(
-                HttpMethod.POST,
-                "/auth/login",
-                null,
-                Map.of("email", email, "password", password)))
+                HttpMethod.POST, "/auth/login", null, Map.of("email", email, "password", password)))
         .isEqualTo(401);
   }
 
@@ -162,8 +158,7 @@ public class AccountManagementSteps {
   @When("they request {word} {string}")
   public void theyRequest(String method, String path) {
     HttpMethod httpMethod = HttpMethod.valueOf(method);
-    lastStatus =
-        send(httpMethod, path, userToken, httpMethod == HttpMethod.GET ? null : Map.of());
+    lastStatus = send(httpMethod, path, userToken, httpMethod == HttpMethod.GET ? null : Map.of());
   }
 
   @When("an anonymous visitor requests {word} {string}")
