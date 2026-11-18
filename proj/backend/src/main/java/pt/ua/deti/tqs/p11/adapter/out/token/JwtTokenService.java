@@ -86,4 +86,10 @@ public class JwtTokenService implements AccessTokenService {
       return Optional.empty();
     }
   }
+
+  /** Decoder with the same key and rules, used by the security filter (US13). */
+  public JwtDecoder jwtDecoder() {
+    throw new UnsupportedOperationException("not implemented yet");
+  }
+
 }

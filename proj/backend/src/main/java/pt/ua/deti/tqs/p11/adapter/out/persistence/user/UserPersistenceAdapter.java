@@ -1,6 +1,8 @@
 package pt.ua.deti.tqs.p11.adapter.out.persistence.user;
 
 import java.util.Optional;
+import java.util.UUID;
+
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
@@ -47,5 +49,10 @@ class UserPersistenceAdapter implements UserRepository {
   @Override
   public Optional<User> findByEmail(EmailAddress email) {
     return repository.findByEmail(email.value()).map(UserJpaEntity::toDomain);
+  }
+
+  @Override
+  public Optional<User> findById(UUID id) {
+    throw new UnsupportedOperationException("not implemented yet");
   }
 }

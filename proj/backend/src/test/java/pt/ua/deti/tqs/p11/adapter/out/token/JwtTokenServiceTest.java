@@ -14,6 +14,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
+
 import pt.ua.deti.tqs.p11.application.auth.TokenClaims;
 import pt.ua.deti.tqs.p11.domain.user.Role;
 
@@ -105,5 +108,13 @@ class JwtTokenServiceTest {
     Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     assertThatCode(() -> new JwtTokenService(SECRET, TTL, clock)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void jwtDecoder_appliesTheSameExpiryRules() {
+    String token = serviceAt(NOW).issue(USER_ID, Role.END_USER);
+    JwtDecoder decoderAfterExpiry = serviceAt(NOW.plus(TTL).plusSeconds(1)).jwtDecoder();
+
+    assertThatThrownBy(() -> decoderAfterExpiry.decode(token)).isInstanceOf(JwtException.class);
   }
 }

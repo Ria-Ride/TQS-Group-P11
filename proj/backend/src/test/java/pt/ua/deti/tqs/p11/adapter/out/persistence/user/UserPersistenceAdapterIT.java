@@ -75,4 +75,17 @@ class UserPersistenceAdapterIT {
   void findByEmail_unknownAddress_isEmpty() {
     assertThat(users.findByEmail(new EmailAddress("bruno.lima@example.com"))).isEmpty();
   }
+
+  @Test
+  void findById_returnsTheStoredUser() {
+    User ana = User.guest(ANA_ID, "Ana Sousa", ANA_EMAIL, "hashed-password");
+    users.save(ana);
+
+    assertThat(users.findById(ANA_ID)).contains(ana);
+  }
+
+  @Test
+  void findById_unknownId_isEmpty() {
+    assertThat(users.findById(OTHER_ID)).isEmpty();
+  }
 }
