@@ -69,10 +69,10 @@ describe("registration page", () => {
 
     await register("Ana Sousa", "ana.sousa@example.com", "Passw0rd!");
 
-    const message = "This email already has an account. Log in instead.";
-    expect(await screen.findByText(message)).toBeInTheDocument();
-    expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(message);
-    expect(screen.getByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
+    expect(await screen.findByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
+    expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(
+      "This email already has an account. Log in instead.",
+    );
   });
 
   it("shows a general error when the server cannot be reached", async () => {

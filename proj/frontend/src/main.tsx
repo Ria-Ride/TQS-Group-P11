@@ -1,9 +1,15 @@
+import "@fontsource/outfit/400.css";
+import "@fontsource/outfit/700.css";
+import "./styles/theme.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router";
 import App from "./App";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </StrictMode>,
 );
