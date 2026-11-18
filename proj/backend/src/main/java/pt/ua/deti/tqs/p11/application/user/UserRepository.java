@@ -9,7 +9,7 @@ public interface UserRepository {
 
   boolean existsByEmail(EmailAddress email);
 
-  User save(User user);
-
   Optional<User> findByEmail(EmailAddress email);
+
+  User save(User user);
 }

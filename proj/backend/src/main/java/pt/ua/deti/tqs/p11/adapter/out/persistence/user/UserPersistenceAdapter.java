@@ -46,6 +46,6 @@ class UserPersistenceAdapter implements UserRepository {
 
   @Override
   public Optional<User> findByEmail(EmailAddress email) {
-    throw new UnsupportedOperationException("not implemented yet");
+    return repository.findByEmail(email.value()).map(UserJpaEntity::toDomain);
   }
 }

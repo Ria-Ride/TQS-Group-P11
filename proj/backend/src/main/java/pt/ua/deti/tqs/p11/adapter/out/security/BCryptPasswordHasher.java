@@ -15,6 +15,6 @@ public class BCryptPasswordHasher implements PasswordHasher {
 
   @Override
   public boolean matches(String rawPassword, String hash) {
-    throw new UnsupportedOperationException("not implemented yet");
+    return encoder.matches(rawPassword, hash);
   }
 }
