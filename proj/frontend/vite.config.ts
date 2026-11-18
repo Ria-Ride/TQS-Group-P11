@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 // In development (npm run dev) Vite forwards /api to a backend on localhost:8080,
@@ -12,5 +12,13 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
+  },
+  test: {
+    // A simulated browser (DOM, sessionStorage) so components can be tested without a real one.
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    restoreMocks: true,
+    // Mocked API functions start every test with no programmed answer.
+    mockReset: true,
   },
 });
