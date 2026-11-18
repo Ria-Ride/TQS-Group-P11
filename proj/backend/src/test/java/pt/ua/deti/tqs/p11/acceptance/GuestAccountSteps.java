@@ -33,6 +33,18 @@ public class GuestAccountSteps {
   private RestClient http;
   private ResponseEntity<Map<String, Object>> lastResponse;
 
+  /** Token of the tourist who logged in, used by the own-data steps. */
+  private String accessToken;
+
+  private ResponseEntity<Map<String, Object>> login(String email, String password) {
+    return http.post()
+        .uri("/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Map.of("email", email, "password", password))
+        .retrieve()
+        .toEntity(ApiClient.JSON_OBJECT);
+  }
+
   @Before
   public void startFromAnEmptyDatabase() {
     jdbc.update("DELETE FROM users");
@@ -115,22 +127,24 @@ public class GuestAccountSteps {
 
   @When("a tourist logs in with email {string} and password {string}")
   public void aTouristLogsIn(String email, String password) {
-    pending();
+    lastResponse = login(email, password);
   }
 
   @Given("the tourist is logged in with email {string} and password {string}")
   public void theTouristIsLoggedIn(String email, String password) {
-    pending();
+    ResponseEntity<Map<String, Object>> response = login(email, password);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    accessToken = (String) response.getBody().get("accessToken");
   }
 
   @Then("the login is accepted")
   public void theLoginIsAccepted() {
-    pending();
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
   }
 
   @Then("the login is refused as unauthorized")
   public void theLoginIsRefusedAsUnauthorized() {
-    pending();
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 
   @When("the tourist requests the data of the account with email {string}")

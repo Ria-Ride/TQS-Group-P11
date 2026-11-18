@@ -96,3 +96,23 @@ Limitation: inside a pull request, the review sees changes to direct Maven depen
 in `pom.xml`. A vulnerable transitive dependency that comes in indirectly (for example,
 with a Spring Boot upgrade) is reported by Dependabot alerts after the merge.
 The frontend's `package-lock.json` lists every package, so npm has no such gap.
+
+### Authentication
+
+| Endpoint | Body | Success | Errors |
+| --- | --- | --- | --- |
+| `POST /auth/guest` | `name`, `email`, `password` | `201` | `400` invalid field, `409` e-mail in use |
+| `POST /auth/login` | `email`, `password` | `200` | `400` missing field, `401` invalid credentials |
+
+Both return `{ "userId", "accessToken", "tokenType": "Bearer" }`. Errors are
+[problem details](https://www.rfc-editor.org/rfc/rfc9457) with an `errors` map of field → message.
+
+**Access token**: JWT signed with HS256. Claims: `sub` (user id, UUID), `role`
+(`END_USER`, `OPERATOR`, `CLIENT_MANAGER`, `ADMIN`), `iat`, `exp`. Valid for
+`app.jwt.time-to-live` (default `PT1H`, 1 hour), with no clock skew and no refresh token.
+Send it as `Authorization: Bearer <token>`.
+The signing key comes from the `APP_JWT_SECRET` environment variable (at least 32 bytes).
+Never commit it.
+
+Rules: e-mails are case-insensitive. Passwords have 8 characters to 72 bytes (BCrypt limit).
+Unknown e-mail and wrong password give the same 401.
