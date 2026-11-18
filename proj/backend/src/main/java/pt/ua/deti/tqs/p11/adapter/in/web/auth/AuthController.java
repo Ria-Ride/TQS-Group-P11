@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import pt.ua.deti.tqs.p11.application.auth.LoginCommand;
+import pt.ua.deti.tqs.p11.application.auth.LoginUseCase;
 import pt.ua.deti.tqs.p11.application.auth.RegisterGuestCommand;
 import pt.ua.deti.tqs.p11.application.auth.RegisterGuestUseCase;
 
@@ -16,9 +18,11 @@ import pt.ua.deti.tqs.p11.application.auth.RegisterGuestUseCase;
 class AuthController {
 
   private final RegisterGuestUseCase registerGuest;
+  private final LoginUseCase login;
 
-  AuthController(RegisterGuestUseCase registerGuest) {
+  AuthController(RegisterGuestUseCase registerGuest, LoginUseCase login) {
     this.registerGuest = registerGuest;
+    this.login = login;
   }
 
   /** Creates a guest account (BR10) and returns an access token for it. */
@@ -28,5 +32,12 @@ class AuthController {
     return AccessTokenResponse.from(
         registerGuest.register(
             new RegisterGuestCommand(request.name(), request.email(), request.password())));
+  }
+
+  /** Checks the credentials and returns an access token. */
+  @PostMapping("/login")
+  AccessTokenResponse login(@Valid @RequestBody LoginRequest request) {
+    return AccessTokenResponse.from(
+        login.login(new LoginCommand(request.email(), request.password())));
   }
 }

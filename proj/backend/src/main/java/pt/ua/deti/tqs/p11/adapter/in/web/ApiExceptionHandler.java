@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
+import pt.ua.deti.tqs.p11.application.auth.InvalidCredentialsException;
 
 /**
  * Maps exceptions to HTTP responses in one place (RFC 9457 problem details). Every error carries an
@@ -35,5 +36,10 @@ class ApiExceptionHandler {
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
     problem.setProperty("errors", errors);
     return problem;
+  }
+
+  @ExceptionHandler(InvalidCredentialsException.class)
+  ProblemDetail invalidCredentials(InvalidCredentialsException e) {
+    return problem(HttpStatus.UNAUTHORIZED, e.getMessage(), Map.of());
   }
 }
