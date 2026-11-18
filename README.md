@@ -78,3 +78,21 @@ git clone https://github.com/o-reis/tqs-telemetry-simulator.git proj/simulator
 All changes go through a Pull Request from a feature branch named after the Jira story
 (`KAN-XX-short-description`). Direct pushes to `main` are blocked; merging requires at least one
 approval from another team member.
+
+### Dependency vulnerability scanning
+
+Dependencies are checked for known vulnerabilities (Q3) in two ways:
+
+- **On every pull request**, the [Dependency review](.github/workflows/dependency-review.yml)
+  workflow fails when the PR adds or upgrades to a runtime dependency with a known
+  vulnerability of **high or critical** severity, and posts a summary comment on the PR.
+  It is a required check, so such a PR cannot be merged.
+- **On `main`**, Dependabot alerts report vulnerabilities already in the code, in the
+  repository's *Security* tab. Dependabot also opens security-fix PRs, and, every Monday,
+  grouped version-update PRs for Maven, npm and GitHub Actions
+  ([configuration](.github/dependabot.yml)).
+
+Limitation: inside a pull request, the review sees changes to direct Maven dependencies
+in `pom.xml`. A vulnerable transitive dependency that comes in indirectly (for example,
+with a Spring Boot upgrade) is reported by Dependabot alerts after the merge.
+The frontend's `package-lock.json` lists every package, so npm has no such gap.
