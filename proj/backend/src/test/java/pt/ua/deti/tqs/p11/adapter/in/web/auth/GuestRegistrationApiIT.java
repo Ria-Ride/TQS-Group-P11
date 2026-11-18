@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,7 +68,8 @@ class GuestRegistrationApiIT {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     UUID userId = UUID.fromString((String) response.getBody().get("userId"));
-    TokenClaims claims = tokens.verify((String) response.getBody().get("accessToken")).orElseThrow();
+    TokenClaims claims =
+        tokens.verify((String) response.getBody().get("accessToken")).orElseThrow();
     assertThat(claims.userId()).isEqualTo(userId);
     assertThat(claims.role()).isEqualTo(Role.END_USER);
   }
@@ -92,7 +94,9 @@ class GuestRegistrationApiIT {
     ResponseEntity<Map<String, Object>> response = register(body);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat((Map<?, ?>) response.getBody().get("errors")).containsOnlyKeys("name");
+    assertThat(response.getBody())
+        .extractingByKey("errors", InstanceOfAssertFactories.map(String.class, Object.class))
+        .containsOnlyKeys("name");
     assertThat(accountsWithEmail("ana.sousa@example.com")).isZero();
   }
 
@@ -104,7 +108,9 @@ class GuestRegistrationApiIT {
     ResponseEntity<Map<String, Object>> response = register(body);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat((Map<?, ?>) response.getBody().get("errors")).containsOnlyKeys("email");
+    assertThat(response.getBody())
+        .extractingByKey("errors", InstanceOfAssertFactories.map(String.class, Object.class))
+        .containsOnlyKeys("email");
   }
 
   @Test
@@ -116,7 +122,9 @@ class GuestRegistrationApiIT {
     ResponseEntity<Map<String, Object>> response = register(sameEmail);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat((Map<?, ?>) response.getBody().get("errors")).containsOnlyKeys("email");
+    assertThat(response.getBody())
+        .extractingByKey("errors", InstanceOfAssertFactories.map(String.class, Object.class))
+        .containsOnlyKeys("email");
     assertThat(accountsWithEmail("ana.sousa@example.com")).isEqualTo(1);
   }
 }
