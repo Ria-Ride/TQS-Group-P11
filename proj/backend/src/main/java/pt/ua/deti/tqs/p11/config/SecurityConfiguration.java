@@ -12,15 +12,22 @@ import org.springframework.security.web.SecurityFilterChain;
 import pt.ua.deti.tqs.p11.adapter.in.web.security.ActiveAccountAuthenticationConverter;
 import pt.ua.deti.tqs.p11.adapter.in.web.security.SecurityProblemHandler;
 import pt.ua.deti.tqs.p11.adapter.out.token.JwtTokenService;
+import pt.ua.deti.tqs.p11.domain.user.Role;
 
 /**
- * API security (US13): stateless bearer tokens and the BR23 role x endpoint rules from the access
- * matrix (src/test/resources/security/access-matrix.csv). Anything not listed is denied, so a new
- * endpoint is closed until its row is added. 401 and 403 get the same problem body as other errors.
+ * API security (US13): stateless bearer tokens and the BR23 role x endpoint rules. They mirror the
+ * access matrix (src/test/resources/security/access-matrix.csv); AccessMatrixApiIT fails when the
+ * two disagree, so change both together. ADMIN is allowed everywhere. Anything not listed is
+ * denied. 401 and 403 get the same problem body as other errors.
  */
 @Configuration
 @EnableMethodSecurity
 class SecurityConfiguration {
+
+  private static final String END_USER = Role.END_USER.name();
+  private static final String OPERATOR = Role.OPERATOR.name();
+  private static final String CLIENT_MANAGER = Role.CLIENT_MANAGER.name();
+  private static final String ADMIN = Role.ADMIN.name();
 
   @Bean
   SecurityFilterChain apiSecurity(
@@ -35,6 +42,7 @@ class SecurityConfiguration {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(requests ->
             requests
+                // Public: guest registration, login, health.
                 .requestMatchers(HttpMethod.POST, "/auth/guest", "/auth/login")
                 .permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health")
@@ -42,11 +50,61 @@ class SecurityConfiguration {
                 // Errors such as malformed JSON are forwarded to /error; keep their status.
                 .requestMatchers("/error")
                 .permitAll()
-                // Ownership of /users/{id} is checked by @PreAuthorize (OwnershipPolicy).
+                // Users. Ownership of /users/{id} is checked by @PreAuthorize (OwnershipPolicy).
                 .requestMatchers(HttpMethod.GET, "/users/me", "/users/{id}")
                 .authenticated()
+                // Admin account management (US13).
                 .requestMatchers("/admin/**")
-                .hasRole("ADMIN")
+                .hasRole(ADMIN)
+                // Catalogue every role reads: hubs, vehicles, vehicle types, rules, pass types.
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/hubs",
+                    "/hubs/{id}",
+                    "/vehicles",
+                    "/vehicles/{id}",
+                    "/vehicle-types",
+                    "/usage-rules",
+                    "/pass-types")
+                .authenticated()
+                // Fleet operations and maintenance (US08, US10-US12).
+                .requestMatchers(
+                    HttpMethod.GET, "/vehicles/{id}/history", "/tickets", "/fleet/overview")
+                .hasAnyRole(OPERATOR, ADMIN)
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/hubs",
+                    "/vehicles",
+                    "/vehicles/{id}/transitions",
+                    "/tickets",
+                    "/tickets/{id}/close")
+                .hasAnyRole(OPERATOR, ADMIN)
+                .requestMatchers(HttpMethod.PATCH, "/tickets/{id}/assignee")
+                .hasAnyRole(OPERATOR, ADMIN)
+                // Hub capacity: operators (US08) and client managers (US14).
+                .requestMatchers(HttpMethod.PATCH, "/hubs/{id}")
+                .hasAnyRole(OPERATOR, CLIENT_MANAGER, ADMIN)
+                // Client management and KPIs (US14, US15).
+                .requestMatchers(HttpMethod.GET, "/stay-codes", "/kpis")
+                .hasAnyRole(CLIENT_MANAGER, ADMIN)
+                .requestMatchers(HttpMethod.POST, "/pass-types", "/stay-codes")
+                .hasAnyRole(CLIENT_MANAGER, ADMIN)
+                .requestMatchers(HttpMethod.PATCH, "/vehicle-types/{type}", "/pass-types/{id}")
+                .hasAnyRole(CLIENT_MANAGER, ADMIN)
+                .requestMatchers(HttpMethod.PUT, "/usage-rules")
+                .hasAnyRole(CLIENT_MANAGER, ADMIN)
+                // Tourist flows (US03-US07). Ownership of a booking is checked in its story.
+                .requestMatchers(HttpMethod.GET, "/passes", "/bookings", "/bookings/{id}")
+                .hasAnyRole(END_USER, ADMIN)
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/passes",
+                    "/bookings",
+                    "/bookings/{id}/start",
+                    "/bookings/{id}/end",
+                    "/bookings/{id}/cancel")
+                .hasAnyRole(END_USER, ADMIN)
+                // Anything not in the matrix is closed until its row is added.
                 .anyRequest()
                 .denyAll())
         // No token at all, or a role without permission.

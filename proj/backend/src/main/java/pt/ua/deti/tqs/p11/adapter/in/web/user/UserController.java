@@ -20,7 +20,7 @@ class UserController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@ownership.isSelf(#id, authentication)")
+  @PreAuthorize("@ownership.isSelf(#id, authentication) or hasRole('ADMIN')")
   UserProfileResponse get(@PathVariable UUID id) {
     return UserProfileResponse.from(profiles.get(id));
   }
