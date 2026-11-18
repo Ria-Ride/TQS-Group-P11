@@ -25,13 +25,13 @@ export interface Credentials {
 }
 
 export function registerGuest(input: GuestRegistration): Promise<AccessGrant> {
-  throw new Error("not implemented yet");
+  return requestJson<AccessGrant>("/auth/guest", { method: "POST", body: input });
 }
 
 export function login(input: Credentials): Promise<AccessGrant> {
-  throw new Error("not implemented yet");
+  return requestJson<AccessGrant>("/auth/login", { method: "POST", body: input });
 }
 
 export function getProfile(userId: string, token: string): Promise<UserProfile> {
-  throw new Error("not implemented yet");
+  return requestJson<UserProfile>(`/users/${encodeURIComponent(userId)}`, { token });
 }

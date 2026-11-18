@@ -20,5 +20,32 @@ export interface RequestOptions {
 }
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  throw new Error("not implemented yet");
+  const headers: Record<string, string> = {};
+  if (options.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (options.token) {
+    headers["Authorization"] = `Bearer ${options.token}`;
+  }
+
+  const response = await fetch(`/api${path}`, {
+    method: options.method ?? "GET",
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await readFieldErrors(response));
+  }
+  return (await response.json()) as T;
+}
+
+/** The backend sends problem details with an "errors" map; anything else means no field errors. */
+async function readFieldErrors(response: Response): Promise<FieldErrors> {
+  try {
+    const body = (await response.json()) as { errors?: FieldErrors };
+    return body.errors ?? {};
+  } catch {
+    return {};
+  }
 }
