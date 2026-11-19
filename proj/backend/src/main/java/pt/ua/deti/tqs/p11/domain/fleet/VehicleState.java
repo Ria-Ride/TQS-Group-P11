@@ -1,6 +1,12 @@
 package pt.ua.deti.tqs.p11.domain.fleet;
 
-/** The states of the vehicle lifecycle (Product Specs 3.3). */
+import java.util.EnumSet;
+import java.util.Set;
+
+/**
+ * The states of the vehicle lifecycle (Product Specs 3.3). The allowed transitions are a table
+ * kept in one place, after(), read per action: "from these states, the action leads to that one".
+ */
 public enum VehicleState {
   DEACTIVATED,
   AVAILABLE,
@@ -10,13 +16,38 @@ public enum VehicleState {
   IN_TRANSIT,
   RETIRED;
 
-  /** BR16: the state reached by the action, or ForbiddenTransitionException. */
+  /**
+   * BR16: the state reached by the action. Activation always leads to Available; retirement is
+   * final. A vehicle with an active booking is Reserved or InUse, so it can be neither deactivated
+   * nor retired.
+   *
+   * @throws ForbiddenTransitionException if the lifecycle has no such transition
+   */
   public VehicleState after(VehicleAction action) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-80)");
+    return switch (action) {
+      case ACTIVATE -> to(AVAILABLE, action, EnumSet.of(DEACTIVATED));
+      case DEACTIVATE -> to(DEACTIVATED, action, EnumSet.of(AVAILABLE));
+      case START_MOVE -> to(IN_TRANSIT, action, EnumSet.of(AVAILABLE));
+      case CONFIRM_ARRIVAL -> to(AVAILABLE, action, EnumSet.of(IN_TRANSIT));
+      case RETIRE -> to(RETIRED, action, EnumSet.of(DEACTIVATED, AVAILABLE, MAINTENANCE));
+    };
   }
 
-  /** BR14: whether a vehicle in this state is physically at a hub and takes one of its slots. */
+  /**
+   * BR14: whether a vehicle in this state is physically at a hub and takes one of its slots. A
+   * switch with no default, so a new state does not compile until it is classified here.
+   */
   public boolean isAtHub() {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-80)");
+    return switch (this) {
+      case DEACTIVATED, AVAILABLE, RESERVED, MAINTENANCE -> true;
+      case IN_USE, IN_TRANSIT, RETIRED -> false;
+    };
+  }
+
+  private VehicleState to(VehicleState target, VehicleAction action, Set<VehicleState> from) {
+    if (!from.contains(this)) {
+      throw new ForbiddenTransitionException(this, action);
+    }
+    return target;
   }
 }
