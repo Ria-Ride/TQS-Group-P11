@@ -14,7 +14,7 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH";
   body?: unknown;
   token?: string;
 }

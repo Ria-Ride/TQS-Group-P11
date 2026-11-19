@@ -20,26 +20,32 @@ export interface NewAccount {
   fieldTechnician: boolean;
 }
 
-// US13 red step: not implemented yet. requestJson is imported for the green step.
-void requestJson;
-
-export function listAccounts(_token: string): Promise<Account[]> {
-  return Promise.resolve([]);
+/** US13: account management, for admins only (the API answers 403 to anyone else). */
+export function listAccounts(token: string): Promise<Account[]> {
+  return requestJson<Account[]>("/admin/users", { token });
 }
 
-export function createAccount(_input: NewAccount, _token: string): Promise<Account> {
-  return Promise.resolve({} as Account);
+export function createAccount(input: NewAccount, token: string): Promise<Account> {
+  return requestJson<Account>("/admin/users", { method: "POST", body: input, token });
 }
 
 export function changeRole(
-  _id: string,
-  _role: Role,
-  _fieldTechnician: boolean,
-  _token: string,
+  id: string,
+  role: Role,
+  fieldTechnician: boolean,
+  token: string,
 ): Promise<Account> {
-  return Promise.resolve({} as Account);
+  return requestJson<Account>(`/admin/users/${encodeURIComponent(id)}/role`, {
+    method: "PATCH",
+    body: { role, fieldTechnician },
+    token,
+  });
 }
 
-export function setActive(_id: string, _active: boolean, _token: string): Promise<Account> {
-  return Promise.resolve({} as Account);
+export function setActive(id: string, active: boolean, token: string): Promise<Account> {
+  return requestJson<Account>(`/admin/users/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: { active },
+    token,
+  });
 }
