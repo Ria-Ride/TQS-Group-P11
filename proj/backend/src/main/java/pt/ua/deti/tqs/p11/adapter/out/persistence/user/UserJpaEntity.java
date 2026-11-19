@@ -31,6 +31,12 @@ class UserJpaEntity {
   @Column(nullable = false, length = 20)
   private Role role;
 
+  @Column(name = "field_technician", nullable = false)
+  private boolean fieldTechnician;
+
+  @Column(nullable = false)
+  private boolean active;
+
   /** For JPA only. */
   protected UserJpaEntity() {}
 
@@ -41,10 +47,12 @@ class UserJpaEntity {
     entity.email = user.email().value();
     entity.passwordHash = user.passwordHash();
     entity.role = user.role();
+    entity.fieldTechnician = user.fieldTechnician();
+    entity.active = user.active();
     return entity;
   }
 
   User toDomain() {
-    return new User(id, name, new EmailAddress(email), passwordHash, role);
+    return new User(id, name, new EmailAddress(email), passwordHash, role, fieldTechnician, active);
   }
 }

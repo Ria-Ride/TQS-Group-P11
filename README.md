@@ -45,7 +45,7 @@ Roles: Team Coordinator, Product Owner, QA Engineer, DevOps Master. Every member
 README.md
 AGENTS.md            agent instructions (AI2)
 .github/             workflows, pull request template
-docs/                reports (PDF), presentation
+docs/                reports (PDF), presentation, testing notes (docs/testing/)
 docker-compose.yml   whole stack as code: backend, frontend, PostgreSQL
 .env.example         variable names for .env (copy, then set the values)
 proj/backend/        Spring Boot (Java 21) backend
@@ -64,6 +64,11 @@ docker compose up --build     # backend, frontend and PostgreSQL
 ```
 
 Never commit `.env`. Compose refuses to start when `APP_JWT_SECRET` is not set.
+
+The first platform admin comes from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (and optionally
+`ADMIN_NAME`) in `.env`. At startup the backend creates that ADMIN account if no account has that
+e-mail; an existing account is never changed. Without the variables no admin is created and a
+warning is logged. Admin roles are changed directly in the database, never through the API.
 
 Open http://localhost (or the `FRONTEND_PORT` set in `.env`). Without a session the login page opens;
 from there you can create a guest account. Nginx serves the app and forwards `/api/*` to the backend,
@@ -87,6 +92,10 @@ git clone https://github.com/o-reis/tqs-telemetry-simulator.git proj/simulator
 Backend integration tests and Cucumber scenarios need Docker running. Gherkin features are in
 `proj/backend/src/test/resources/features`.
 
+`AccessMatrixApiIT` checks every (endpoint, caller) pair of the access matrix over HTTP and fails
+when an endpoint of the API has no row in it. The pairwise-testing (T7) evaluation for that matrix
+is in [`docs/testing/pairwise-access-matrix.md`](docs/testing/pairwise-access-matrix.md).
+
 ## API
 
 ### Authentication
@@ -109,18 +118,56 @@ Never commit it.
 Rules: e-mails are case-insensitive. Passwords have 8 characters to 72 bytes (BCrypt limit).
 Unknown e-mail and wrong password give the same 401.
 
+On every request the account is read from the database: a token of a deactivated or deleted
+account gets `401`, and the role comes from the database, not from the token's `role` claim, so a
+role change applies at once. A deactivated account cannot log in (same `401` as wrong credentials).
+
+### Access control (BR23)
+
+Which role may call which endpoint is defined in the access matrix,
+[`proj/backend/src/test/resources/security/access-matrix.csv`](proj/backend/src/test/resources/security/access-matrix.csv)
+(`Y` allowed, `N` denied, `OWN` own resource only), and enforced in `SecurityConfiguration`.
+`ADMIN` is allowed everywhere. Paths that are not in the matrix are denied to everyone.
+
+- No token, an invalid or expired token, or the token of a deactivated account: `401`, with a
+  `WWW-Authenticate: Bearer` header.
+- A valid token without permission: `403`.
+
+Both use the same problem-details body as the other errors.
+
+**Adding an endpoint:** add its row to the matrix, add its rule to `SecurityConfiguration` and, if
+the resource belongs to a user, add its path to `OWNERSHIP_CHECKED` in `AccessMatrixApiIT`. CI
+fails until the matrix and the code agree.
+
 ### Users
 
 | Endpoint | Success | Errors |
 | --- | --- | --- |
-| `GET /users/{id}` | `200` with `id`, `name`, `email`, `role` | `401` missing, invalid or expired token; `403` not your own account (BR23) |
+| `GET /users/{id}` | `200` with `id`, `name`, `email`, `role` | `401` missing, invalid or expired token; `403` not your own account, unless you are an `ADMIN` (BR23) |
 
 Every endpoint except registration, login, `/actuator/health` and `/error` requires a bearer token.
+
+### Admin accounts (US13)
+
+Only for `ADMIN`. Responses never include the password.
+
+| Endpoint | Body | Success | Errors |
+| --- | --- | --- | --- |
+| `GET /admin/users` | — | `200`, ordered by name | — |
+| `POST /admin/users` | `name`, `email`, `password`, `role`, `fieldTechnician` (optional, default `false`) | `201` | `400` invalid field, `409` e-mail in use or role `ADMIN` |
+| `PATCH /admin/users/{id}/role` | `role`, `fieldTechnician` (optional, default `false`) | `200` | `400` invalid field, `404` unknown account, `409` admin account or role `ADMIN` |
+| `PATCH /admin/users/{id}/status` | `active` | `200` | `400` missing `active`, `404` unknown account, `409` admin account |
+
+Each returns `{ "id", "name", "email", "role", "fieldTechnician", "active" }`. Only an `OPERATOR`
+can be a field technician (BR20, also enforced by a database constraint). Admin accounts cannot be
+created, changed or deactivated through the API.
 
 ## Frontend
 
 React + Vite + TypeScript with React Router. Pages: guest registration (`/register`),
-login (`/login`) and home (`/`, requires a session). It uses the Ria Ride palette and the Outfit
+login (`/login`), home (`/`, requires a session) and account management (`/admin/users`, for
+admins only: list, create, change role, activate or deactivate; the home page links to it for
+admins). It uses the Ria Ride palette and the Outfit
 font (served from our own origin with Fontsource). The colours are CSS variables in
 `proj/frontend/src/styles/theme.css`, checked for WCAG AA contrast. The access token is kept in
 `sessionStorage` for as long as the tab is open.

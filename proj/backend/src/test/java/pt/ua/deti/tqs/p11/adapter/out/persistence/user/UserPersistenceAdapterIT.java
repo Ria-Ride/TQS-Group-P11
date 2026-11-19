@@ -10,11 +10,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pt.ua.deti.tqs.p11.TestcontainersConfiguration;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
 import pt.ua.deti.tqs.p11.domain.user.EmailAddress;
+import pt.ua.deti.tqs.p11.domain.user.Role;
 import pt.ua.deti.tqs.p11.domain.user.User;
 
 @SpringBootTest
@@ -87,5 +89,51 @@ class UserPersistenceAdapterIT {
   @Test
   void findById_unknownId_isEmpty() {
     assertThat(users.findById(OTHER_ID)).isEmpty();
+  }
+
+  // US13 (KAN-77): technician flag, account status, updates and listing.
+
+  @Test
+  void save_keepsTheTechnicianFlagAndTheStatus() {
+    User technician =
+        User.account(ANA_ID, "Ana Sousa", ANA_EMAIL, "hashed-password", Role.OPERATOR, true)
+            .deactivate();
+    users.save(technician);
+
+    assertThat(users.findById(ANA_ID)).contains(technician);
+  }
+
+  @Test
+  void save_existingAccount_updatesItInPlace() {
+    users.save(
+        User.account(ANA_ID, "Ana Sousa", ANA_EMAIL, "hashed-password", Role.OPERATOR, false));
+    User changed =
+        users.findById(ANA_ID).orElseThrow().changeRole(Role.OPERATOR, true).deactivate();
+
+    users.save(changed);
+
+    assertThat(users.findById(ANA_ID)).contains(changed);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class)).isEqualTo(1);
+  }
+
+  @Test
+  void findAll_returnsEveryAccountOrderedByName() {
+    users.save(
+        User.guest(OTHER_ID, "Rui Costa", new EmailAddress("rui.costa@example.com"), "rui-hash"));
+    users.save(User.guest(ANA_ID, "Ana Sousa", ANA_EMAIL, "hashed-password"));
+
+    assertThat(users.findAll()).extracting(User::name).containsExactly("Ana Sousa", "Rui Costa");
+  }
+
+  /** BR20 also holds for rows edited directly in the database (e.g. by whoever manages admins). */
+  @Test
+  void database_refusesAFieldTechnicianWhoIsNotAnOperator() {
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "INSERT INTO users (id, name, email, password_hash, role, field_technician,"
+                    + " active) VALUES (?, 'Ana Sousa', 'ana.sousa@example.com', 'hash',"
+                    + " 'END_USER', TRUE, TRUE)",
+                ANA_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

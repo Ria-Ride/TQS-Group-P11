@@ -39,9 +39,7 @@ class LoginApiIT {
   void registerAna() {
     jdbc.update("DELETE FROM users");
     http = ApiClient.forPort(port);
-    ResponseEntity<Map<String, Object>> registration =
-        post("/auth/guest", Map.of("name", "Ana Sousa", "email", EMAIL, "password", PASSWORD));
-    anaId = UUID.fromString((String) registration.getBody().get("userId"));
+    anaId = ApiClient.registerGuest(http, "Ana Sousa", EMAIL, PASSWORD).id();
   }
 
   private ResponseEntity<Map<String, Object>> post(String uri, Map<String, String> body) {

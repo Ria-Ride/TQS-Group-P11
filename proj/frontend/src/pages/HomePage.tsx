@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import { getProfile, type UserProfile } from "../api/auth";
 import { ApiError } from "../api/client";
 import { clearSession, loadSession } from "../auth/session";
@@ -53,6 +53,11 @@ export function HomePage() {
           <>
             <h1>Hello, {profile.name}</h1>
             <p className="muted">You are logged in as {profile.email}.</p>
+            {profile.role === "ADMIN" && (
+              <Link className="button" to="/admin/users">
+                Manage accounts
+              </Link>
+            )}
           </>
         )}
         {!profile && error && (

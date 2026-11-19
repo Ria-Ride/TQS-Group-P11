@@ -196,3 +196,71 @@ a:hover {
     padding: 36px 40px;
   }
 }
+
+/* US13: account management page */
+.card-wide {
+  max-width: 1120px;
+  width: 100%;
+}
+
+.field select {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Wide tables scroll inside the card, so the page itself never scrolls sideways on a phone. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.accounts {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.accounts th,
+.accounts td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-sal);
+  vertical-align: middle;
+}
+
+.accounts select {
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+.button-small {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Keep each cell on one line; the table scrolls inside the card when it does not fit. */
+.accounts .checkbox,
+.accounts td:nth-child(5),
+.row-actions {
+  white-space: nowrap;
+}
+
+.row-actions .field-error {
+  white-space: normal;
+}

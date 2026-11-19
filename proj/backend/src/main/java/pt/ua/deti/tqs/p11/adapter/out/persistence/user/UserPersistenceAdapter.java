@@ -1,8 +1,10 @@
 package pt.ua.deti.tqs.p11.adapter.out.persistence.user;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
@@ -53,5 +55,10 @@ class UserPersistenceAdapter implements UserRepository {
   @Override
   public Optional<User> findById(UUID id) {
     return repository.findById(id).map(UserJpaEntity::toDomain);
+  }
+
+  @Override
+  public List<User> findAll() {
+    return repository.findAll(Sort.by("name")).stream().map(UserJpaEntity::toDomain).toList();
   }
 }

@@ -2,6 +2,7 @@ package pt.ua.deti.tqs.p11.application.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +52,8 @@ class LoginUseCaseTest {
   void login_operator_tokenCarriesTheStoredRole() {
     UUID operatorId = UUID.fromString("6f2d3e4c-5b6a-4079-9b8c-0d1e2f3a4b5c");
     EmailAddress operatorEmail = new EmailAddress("rui.costa@example.com");
-    User operator = new User(operatorId, "Rui Costa", operatorEmail, "rui-hash", Role.OPERATOR);
+    User operator =
+        User.account(operatorId, "Rui Costa", operatorEmail, "rui-hash", Role.OPERATOR, false);
     when(users.findByEmail(operatorEmail)).thenReturn(Optional.of(operator));
     when(passwordHasher.matches("Secr3t!xy", "rui-hash")).thenReturn(true);
     when(tokens.issue(operatorId, Role.OPERATOR)).thenReturn("token-for-rui");
@@ -77,6 +79,17 @@ class LoginUseCaseTest {
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> useCase.login(new LoginCommand("bruno.lima@example.com", "Passw0rd!")))
+        .isInstanceOf(InvalidCredentialsException.class);
+    verifyNoInteractions(tokens);
+  }
+
+  /** US13: same refusal as wrong credentials, so it does not reveal that the account exists. */
+  @Test
+  void login_deactivatedAccountWithTheRightPassword_isRefusedLikeWrongCredentials() {
+    when(users.findByEmail(ANA_EMAIL)).thenReturn(Optional.of(ANA.deactivate()));
+    lenient().when(passwordHasher.matches("Passw0rd!", "ana-hash")).thenReturn(true);
+
+    assertThatThrownBy(() -> useCase.login(new LoginCommand("ana.sousa@example.com", "Passw0rd!")))
         .isInstanceOf(InvalidCredentialsException.class);
     verifyNoInteractions(tokens);
   }
