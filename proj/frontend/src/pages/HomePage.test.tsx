@@ -62,4 +62,34 @@ describe("home page", () => {
     expect(screen.getByRole("heading", { name: "Log in" })).toBeInTheDocument();
     expect(loadSession()).toBeNull();
   });
+
+  it("offers account management to an admin", async () => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Marta Reis",
+      email: "marta.reis@example.com",
+      role: "ADMIN",
+    });
+    renderApp("/");
+
+    expect(await screen.findByRole("link", { name: "Manage accounts" })).toHaveAttribute(
+      "href",
+      "/admin/users",
+    );
+  });
+
+  it("does not offer account management to a tourist", async () => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Ana Sousa",
+      email: "ana.sousa@example.com",
+      role: "END_USER",
+    });
+    renderApp("/");
+
+    await screen.findByRole("heading", { name: "Hello, Ana Sousa" });
+    expect(screen.queryByRole("link", { name: "Manage accounts" })).not.toBeInTheDocument();
+  });
 });
