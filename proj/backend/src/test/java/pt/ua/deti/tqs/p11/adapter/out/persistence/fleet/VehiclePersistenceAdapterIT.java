@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 import pt.ua.deti.tqs.p11.TestcontainersConfiguration;
 import pt.ua.deti.tqs.p11.application.fleet.HubRepository;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
@@ -36,6 +38,7 @@ class VehiclePersistenceAdapterIT {
   @Autowired private VehicleRepository vehicles;
   @Autowired private HubRepository hubs;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private TransactionTemplate transaction;
 
   private static Vehicle registered(UUID id, String code, VehicleType type, UUID hubId) {
     return Vehicle.register(id, FleetCode.of(code), type, hubId);
@@ -110,6 +113,16 @@ class VehiclePersistenceAdapterIT {
     // Bypasses existsByCode, as two concurrent registrations would.
     assertThatThrownBy(() -> vehicles.save(sameCode))
         .isInstanceOf(VehicleCodeAlreadyInUseException.class);
+  }
+
+  /** The lock itself is exercised by the concurrent registration test of the API (KAN-82). */
+  @Test
+  void findByIdForUpdate_insideATransaction_returnsTheVehicle() {
+    vehicles.save(bike09());
+
+    Optional<Vehicle> locked = transaction.execute(status -> vehicles.findByIdForUpdate(BIKE_09_ID));
+
+    assertThat(locked).contains(bike09());
   }
 
   @Test

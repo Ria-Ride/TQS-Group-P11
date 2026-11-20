@@ -18,6 +18,14 @@ public interface VehicleRepository {
 
   Optional<Vehicle> findById(UUID id);
 
+  /**
+   * Finds the vehicle and locks it until the current transaction ends, so that two state changes
+   * of the same vehicle run one after the other and neither is lost (K3). Must be called inside a
+   * transaction. When a hub is locked too, lock the vehicle first, so two operations never wait
+   * for each other.
+   */
+  Optional<Vehicle> findByIdForUpdate(UUID id);
+
   boolean existsByCode(FleetCode code);
 
   /**
