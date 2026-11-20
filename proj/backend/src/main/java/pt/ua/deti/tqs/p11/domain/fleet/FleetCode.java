@@ -10,12 +10,17 @@ import java.util.regex.Pattern;
  */
 public record FleetCode(String value) {
 
-  /** Letters, digits, '-' and '_', 1 to 64 characters: no '/', '+' or '#' (MQTT wildcards). */
-  private static final Pattern FORMAT = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+  /**
+   * Letters, digits, '-' and '_', 1 to 64 characters: no '/', '+' or '#' (MQTT wildcards). Public
+   * so the API validates requests with the same rule.
+   */
+  public static final String FORMAT = "[A-Za-z0-9_-]{1,64}";
+
+  private static final Pattern PATTERN = Pattern.compile(FORMAT);
 
   public FleetCode {
     Objects.requireNonNull(value, "value");
-    if (!FORMAT.matcher(value).matches()) {
+    if (!PATTERN.matcher(value).matches()) {
       throw new IllegalArgumentException(
           "A code has 1 to 64 letters, digits, '-' or '_': '%s'".formatted(value));
     }
