@@ -6,17 +6,26 @@ import org.springframework.stereotype.Component;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleStateChangeRepository;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleStateChange;
 
-/** VehicleStateChangeRepository backed by PostgreSQL. Not implemented yet (KAN-79). */
+/** VehicleStateChangeRepository backed by PostgreSQL through Spring Data JPA. */
 @Component
 class VehicleStateChangePersistenceAdapter implements VehicleStateChangeRepository {
 
-  @Override
-  public void save(VehicleStateChange change) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-79)");
+  private final SpringDataVehicleStateChangeRepository repository;
+
+  VehicleStateChangePersistenceAdapter(SpringDataVehicleStateChangeRepository repository) {
+    this.repository = repository;
   }
 
   @Override
+  public void save(VehicleStateChange change) {
+    repository.save(VehicleStateChangeJpaEntity.from(change));
+  }
+
+  /** Ordered by the generated id, i.e. the order in which the changes were recorded. */
+  @Override
   public List<VehicleStateChange> findByVehicleId(UUID vehicleId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-79)");
+    return repository.findByVehicleIdOrderById(vehicleId).stream()
+        .map(VehicleStateChangeJpaEntity::toDomain)
+        .toList();
   }
 }

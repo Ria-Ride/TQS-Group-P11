@@ -1,6 +1,7 @@
 package pt.ua.deti.tqs.p11.domain.fleet;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -11,16 +12,24 @@ import java.util.UUID;
 public record VehicleStateChange(UUID vehicleId, VehicleState from, VehicleState to, Instant at) {
 
   public VehicleStateChange {
-    // Validation not implemented yet (KAN-79).
+    Objects.requireNonNull(vehicleId, "vehicleId");
+    Objects.requireNonNull(to, "to");
+    Objects.requireNonNull(at, "at");
+    if (from == to) {
+      throw new IllegalArgumentException("A state change needs two different states: " + to);
+    }
   }
 
   /** The first entry of every vehicle: it enters the fleet as Deactivated. */
   public static VehicleStateChange registration(UUID vehicleId, Instant at) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-79)");
+    return new VehicleStateChange(vehicleId, null, VehicleState.DEACTIVATED, at);
   }
 
   /** The change from one version of a vehicle to the next, after a transition. */
   public static VehicleStateChange between(Vehicle before, Vehicle after, Instant at) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-79)");
+    if (!before.id().equals(after.id())) {
+      throw new IllegalArgumentException("A state change is about one vehicle");
+    }
+    return new VehicleStateChange(before.id(), before.state(), after.state(), at);
   }
 }
