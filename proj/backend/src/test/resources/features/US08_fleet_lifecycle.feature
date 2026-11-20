@@ -5,8 +5,8 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
   So that the fleet is organized and only vehicles in good condition are offered
 
   # Hubs and vehicles are identified by a code, as in the telemetry simulator (hub-03, bike-0009).
-  # A vehicle given "in a state" is placed at hub "hub-03" (capacity 10), unless the state belongs
-  # to no hub (InUse, InTransit, Retired).
+  # A vehicle given "in state" X is registered at hub "hub-03" (capacity 10) and brought to X.
+  # In InUse, InTransit or Retired it then belongs to no hub.
   # Bookings (US04, US05) and maintenance tickets (US10) do not exist yet, so the steps put a
   # vehicle in Reserved, InUse or Maintenance directly in the database. Activation refused because
   # of an open ticket is added with US10.
@@ -70,14 +70,14 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
   Scenario: A vehicle cannot be registered in a full hub
     Given hub "hub-03" with capacity 10 holds 10 vehicles
     When the operator registers vehicle "bike-0009" of type "E_BIKE" at hub "hub-03"
-    Then the registration is refused because the hub is full
+    Then the vehicle registration is refused because the hub is full
     And vehicle "bike-0009" does not exist
 
   @BR14
   Scenario Outline: Only vehicles physically at a hub take a slot
     Given hub "hub-03" has capacity 1 and its only vehicle "bike-0010" is "<state>"
     When the operator registers vehicle "bike-0009" of type "E_BIKE" at hub "hub-03"
-    Then the registration is <outcome>
+    Then the vehicle registration is <outcome>
 
     Examples:
       | state       | outcome  |
@@ -90,21 +90,21 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
       | Retired     | accepted |
 
   Scenario: A vehicle code can only be used once
-    Given vehicle "bike-0009" is "Deactivated"
+    Given a vehicle "bike-0009" in state "Deactivated"
     When the operator registers vehicle "bike-0009" of type "E_SCOOTER" at hub "hub-03"
-    Then the registration is refused because the code is already in use
+    Then the vehicle registration is refused because the code is already in use
 
   # ---------------------------------------------------------------- Activation and deactivation
 
   @BR16
   Scenario: Activating a vehicle with no open ticket makes it Available
-    Given vehicle "bike-0009" is "Deactivated"
+    Given a vehicle "bike-0009" in state "Deactivated"
     When the operator activates vehicle "bike-0009"
     Then vehicle "bike-0009" is "Available" at hub "hub-03"
 
   @BR16
   Scenario Outline: A vehicle cannot be deactivated while Reserved or InUse
-    Given vehicle "bike-0009" is "<state>"
+    Given a vehicle "bike-0009" in state "<state>"
     When the operator deactivates vehicle "bike-0009"
     Then the transition is <outcome>
     And vehicle "bike-0009" is "<final state>"
@@ -118,7 +118,7 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
   # ---------------------------------------------------------------- Relocation
 
   Scenario: The operator moves a vehicle to another hub
-    Given vehicle "bike-0009" is "Available"
+    Given a vehicle "bike-0009" in state "Available"
     And hub "hub-05" with capacity 10 holds 9 vehicles
     When the operator starts moving vehicle "bike-0009"
     Then vehicle "bike-0009" is "InTransit" and belongs to no hub
@@ -129,7 +129,7 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
 
   @BR14
   Scenario: Arrival at a full hub is refused
-    Given vehicle "bike-0009" is "InTransit"
+    Given a vehicle "bike-0009" in state "InTransit"
     And hub "hub-05" with capacity 10 holds 10 vehicles
     When the operator confirms the arrival of vehicle "bike-0009" at hub "hub-05"
     Then the transition is refused because the hub is full
@@ -137,7 +137,7 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
 
   @BR16
   Scenario Outline: Only an Available vehicle can be moved
-    Given vehicle "bike-0009" is "<state>"
+    Given a vehicle "bike-0009" in state "<state>"
     When the operator starts moving vehicle "bike-0009"
     Then the transition is <outcome>
 
@@ -153,7 +153,7 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
 
   @BR16
   Scenario Outline: A vehicle can be retired only when it has no active booking
-    Given vehicle "bike-0009" is "<state>"
+    Given a vehicle "bike-0009" in state "<state>"
     When the operator retires vehicle "bike-0009"
     Then the transition is <outcome>
     And vehicle "bike-0009" is "<final state>"
@@ -169,7 +169,7 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
 
   @BR16
   Scenario Outline: No transition out of Retired is allowed
-    Given vehicle "bike-0009" is "Retired"
+    Given a vehicle "bike-0009" in state "Retired"
     When the operator asks to <action> vehicle "bike-0009"
     Then the transition is refused
     And vehicle "bike-0009" is "Retired"
