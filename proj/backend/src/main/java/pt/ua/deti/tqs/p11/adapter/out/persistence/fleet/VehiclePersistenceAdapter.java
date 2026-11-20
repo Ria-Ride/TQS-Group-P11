@@ -44,7 +44,7 @@ class VehiclePersistenceAdapter implements VehicleRepository {
 
   @Override
   public Optional<Vehicle> findByIdForUpdate(UUID id) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-79)");
+    return repository.findWithLockById(id).map(VehicleJpaEntity::toDomain);
   }
 
   @Override

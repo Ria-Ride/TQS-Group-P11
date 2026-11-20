@@ -5,7 +5,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
+import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
+import pt.ua.deti.tqs.p11.domain.fleet.Hub;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleStateChange;
 
@@ -41,39 +44,94 @@ public class VehicleLifecycleUseCase {
     this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator");
   }
 
+  /** BR14, BR16: a new vehicle is Deactivated at a hub with a free slot. */
   public Vehicle register(RegisterVehicleCommand command) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-82)");
+    FleetCode code = FleetCode.of(command.code());
+    return transactions.inTransaction(
+        () -> {
+          if (vehicles.existsByCode(code)) {
+            throw new VehicleCodeAlreadyInUseException(code);
+          }
+          Hub hub = lockHubWithFreeSlot(command.hubId());
+          Vehicle vehicle =
+              vehicles.save(Vehicle.register(idGenerator.get(), code, command.type(), hub.id()));
+          history.save(VehicleStateChange.registration(vehicle.id(), clock.instant()));
+          return vehicle;
+        });
   }
 
+  /** BR16: activation needs no open maintenance ticket. */
   public Vehicle activate(UUID vehicleId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-82)");
+    return change(
+        vehicleId,
+        vehicle -> {
+          Vehicle activated = vehicle.activate();
+          if (openTickets.existFor(vehicleId)) {
+            throw new VehicleHasOpenTicketException(vehicle.code());
+          }
+          return activated;
+        });
   }
 
   public Vehicle deactivate(UUID vehicleId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-82)");
+    return change(vehicleId, Vehicle::deactivate);
   }
 
   public Vehicle startMove(UUID vehicleId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-83)");
+    return change(vehicleId, Vehicle::startMove);
   }
 
+  /** BR14: the destination needs a free slot, counted while it is locked. */
   public Vehicle confirmArrival(UUID vehicleId, UUID destinationHubId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-83)");
+    return change(
+        vehicleId,
+        vehicle -> {
+          Vehicle arrived = vehicle.confirmArrival(destinationHubId);
+          lockHubWithFreeSlot(destinationHubId);
+          return arrived;
+        });
   }
 
   public Vehicle retire(UUID vehicleId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-83)");
+    return change(vehicleId, Vehicle::retire);
   }
 
   public List<VehicleStateChange> history(UUID vehicleId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-83)");
+    get(vehicleId);
+    return history.findByVehicleId(vehicleId);
   }
 
   public List<Vehicle> list() {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-82)");
+    return vehicles.findAll();
   }
 
   public Vehicle get(UUID vehicleId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-82)");
+    return vehicles
+        .findById(vehicleId)
+        .orElseThrow(() -> new VehicleNotFoundException(vehicleId));
+  }
+
+  /**
+   * Locks the vehicle, applies the transition, saves it and records it, all in one transaction. If
+   * the transition throws, nothing is saved or recorded (BR16). The vehicle is locked before any
+   * hub, always in that order, so two operations never wait for each other.
+   */
+  private Vehicle change(UUID vehicleId, UnaryOperator<Vehicle> transition) {
+    return transactions.inTransaction(
+        () -> {
+          Vehicle before =
+              vehicles
+                  .findByIdForUpdate(vehicleId)
+                  .orElseThrow(() -> new VehicleNotFoundException(vehicleId));
+          Vehicle after = vehicles.save(transition.apply(before));
+          history.save(VehicleStateChange.between(before, after, clock.instant()));
+          return after;
+        });
+  }
+
+  private Hub lockHubWithFreeSlot(UUID hubId) {
+    Hub hub = hubs.findByIdForUpdate(hubId).orElseThrow(() -> new HubNotFoundException(hubId));
+    hub.requireFreeSlot(vehicles.countAtHub(hubId));
+    return hub;
   }
 }

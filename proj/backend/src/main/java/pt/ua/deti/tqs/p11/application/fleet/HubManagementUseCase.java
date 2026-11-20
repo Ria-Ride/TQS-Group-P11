@@ -5,6 +5,9 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
+import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
+import pt.ua.deti.tqs.p11.domain.fleet.GeoPosition;
+import pt.ua.deti.tqs.p11.domain.fleet.Hub;
 
 /**
  * What an operator does with hubs (US08): register, change the capacity, list. A capacity change
@@ -28,19 +31,42 @@ public class HubManagementUseCase {
     this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator");
   }
 
+  /** A new hub holds no vehicles. Its data is checked by the domain before anything is read. */
   public HubOccupancy register(RegisterHubCommand command) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-81)");
+    FleetCode code = FleetCode.of(command.code());
+    Hub hub =
+        new Hub(
+            idGenerator.get(),
+            code,
+            command.name(),
+            new GeoPosition(command.latitude(), command.longitude()),
+            command.capacity());
+    if (hubs.existsByCode(code)) {
+      throw new HubCodeAlreadyInUseException(code);
+    }
+    return new HubOccupancy(hubs.save(hub), 0);
   }
 
+  /** BR14: refused below the vehicles held, counted while the hub is locked. */
   public HubOccupancy changeCapacity(UUID hubId, int capacity) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-81)");
+    return transactions.inTransaction(
+        () -> {
+          Hub hub = hubs.findByIdForUpdate(hubId).orElseThrow(() -> new HubNotFoundException(hubId));
+          int held = vehicles.countAtHub(hubId);
+          return new HubOccupancy(hubs.save(hub.withCapacity(capacity, held)), held);
+        });
   }
 
+  /** One count per hub: fine for a fleet of a few dozen hubs. */
   public List<HubOccupancy> list() {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-81)");
+    return hubs.findAll().stream().map(this::withOccupancy).toList();
   }
 
   public HubOccupancy get(UUID hubId) {
-    throw new UnsupportedOperationException("Not implemented yet (KAN-81)");
+    return withOccupancy(hubs.findById(hubId).orElseThrow(() -> new HubNotFoundException(hubId)));
+  }
+
+  private HubOccupancy withOccupancy(Hub hub) {
+    return new HubOccupancy(hub, vehicles.countAtHub(hub.id()));
   }
 }
