@@ -50,8 +50,7 @@ public final class FleetApi {
   }
 
   public ResponseEntity<Map<String, Object>> registerVehicle(String code, String type, UUID hubId) {
-    return send(
-        HttpMethod.POST, "/vehicles", Map.of("code", code, "type", type, "hubId", hubId));
+    return send(HttpMethod.POST, "/vehicles", Map.of("code", code, "type", type, "hubId", hubId));
   }
 
   /** A registered (Deactivated) e-bike at the hub. */

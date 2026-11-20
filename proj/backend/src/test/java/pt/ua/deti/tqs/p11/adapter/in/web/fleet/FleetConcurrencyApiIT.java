@@ -49,7 +49,8 @@ class FleetConcurrencyApiIT {
     jdbc.update("DELETE FROM hubs");
     jdbc.update("DELETE FROM users");
     RestClient http = ApiClient.forPort(port);
-    Registered rui = ApiClient.registerGuest(http, "Rui Costa", "rui.costa@example.com", "Passw0rd!");
+    Registered rui =
+        ApiClient.registerGuest(http, "Rui Costa", "rui.costa@example.com", "Passw0rd!");
     jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE id = ?", rui.id());
     operator = new FleetApi(http, rui.token());
   }
@@ -86,19 +87,22 @@ class FleetConcurrencyApiIT {
     }
 
     List<Integer> statuses =
-        concurrently(
-            n ->
-                operator
-                    .registerVehicle("bike-%04d".formatted(n), "E_BIKE", hub)
-                    .getStatusCode()
-                    .value());
+        concurrently(n ->
+            operator
+                .registerVehicle("bike-%04d".formatted(n), "E_BIKE", hub)
+                .getStatusCode()
+                .value());
 
     assertThat(statuses).containsOnlyOnce(201).filteredOn(s -> s != 201).containsOnly(409);
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM vehicles WHERE hub_id = ?", Integer.class, hub))
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM vehicles WHERE hub_id = ?", Integer.class, hub))
         .isEqualTo(10);
   }
 
-  /** BR16: one vehicle moved by several requests at once changes state once and is recorded once. */
+  /**
+   * BR16: one vehicle moved by several requests at once changes state once and is recorded once.
+   */
   @Test
   void startMove_sameVehicleManyTimesAtOnce_exactlyOneSucceeds() throws Exception {
     UUID hub = operator.hub("hub-03", 10);

@@ -32,8 +32,7 @@ class VehiclePersistenceAdapterIT {
   private static final UUID HUB_05_ID = UUID.fromString("2b3c4d5e-0000-4000-8000-000000000105");
   private static final UUID BIKE_09_ID = UUID.fromString("3c4d5e6f-0000-4000-8000-000000000009");
   private static final UUID BIKE_10_ID = UUID.fromString("3c4d5e6f-0000-4000-8000-000000000010");
-  private static final UUID SCOOTER_07_ID =
-      UUID.fromString("3c4d5e6f-0000-4000-8000-000000000107");
+  private static final UUID SCOOTER_07_ID = UUID.fromString("3c4d5e6f-0000-4000-8000-000000000107");
 
   @Autowired private VehicleRepository vehicles;
   @Autowired private HubRepository hubs;
@@ -120,7 +119,8 @@ class VehiclePersistenceAdapterIT {
   void findByIdForUpdate_insideATransaction_returnsTheVehicle() {
     vehicles.save(bike09());
 
-    Optional<Vehicle> locked = transaction.execute(status -> vehicles.findByIdForUpdate(BIKE_09_ID));
+    Optional<Vehicle> locked =
+        transaction.execute(status -> vehicles.findByIdForUpdate(BIKE_09_ID));
 
     assertThat(locked).contains(bike09());
   }
@@ -170,13 +170,12 @@ class VehiclePersistenceAdapterIT {
   /** A vehicle is at a hub if and only if its state is at a hub, also for rows edited by hand. */
   @Test
   void database_refusesAVehicleInTransitWithAHub() {
-    assertThatThrownBy(
-            () ->
-                jdbc.update(
-                    "INSERT INTO vehicles (id, code, type, state, hub_id)"
-                        + " VALUES (?, 'bike-0009', 'E_BIKE', 'IN_TRANSIT', ?)",
-                    BIKE_09_ID,
-                    HUB_03_ID))
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "INSERT INTO vehicles (id, code, type, state, hub_id)"
+                    + " VALUES (?, 'bike-0009', 'E_BIKE', 'IN_TRANSIT', ?)",
+                BIKE_09_ID,
+                HUB_03_ID))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

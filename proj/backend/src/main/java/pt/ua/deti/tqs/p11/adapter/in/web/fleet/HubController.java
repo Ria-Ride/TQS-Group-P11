@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import pt.ua.deti.tqs.p11.application.fleet.HubManagementUseCase;
 
 /**
- * Hubs (US08). Who may call each endpoint is in SecurityConfiguration and the access matrix
- * (BR23): every role reads, operators register, operators and client managers change capacity.
+ * Hubs (US08). Who may call each endpoint is in SecurityConfiguration and the access matrix (BR23):
+ * every role reads, operators register, operators and client managers change capacity.
  */
 @RestController
 @RequestMapping("/hubs")

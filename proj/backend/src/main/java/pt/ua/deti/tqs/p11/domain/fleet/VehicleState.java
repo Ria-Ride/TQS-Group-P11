@@ -4,8 +4,8 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * The states of the vehicle lifecycle (Product Specs 3.3). The allowed transitions are a table
- * kept in one place, after(), read per action: "from these states, the action leads to that one".
+ * The states of the vehicle lifecycle (Product Specs 3.3). The allowed transitions are a table kept
+ * in one place, after(), read per action: "from these states, the action leads to that one".
  */
 public enum VehicleState {
   DEACTIVATED,

@@ -161,8 +161,7 @@ class VehicleLifecycleUseCaseTest {
     assertThat(useCase.activate(BIKE_ID)).isEqualTo(bikeAtHub03(VehicleState.AVAILABLE));
     verify(history)
         .save(
-            new VehicleStateChange(
-                BIKE_ID, VehicleState.DEACTIVATED, VehicleState.AVAILABLE, T0));
+            new VehicleStateChange(BIKE_ID, VehicleState.DEACTIVATED, VehicleState.AVAILABLE, T0));
   }
 
   @Test
@@ -193,8 +192,7 @@ class VehicleLifecycleUseCaseTest {
     assertThat(useCase.deactivate(BIKE_ID)).isEqualTo(bikeAtHub03(VehicleState.DEACTIVATED));
     verify(history)
         .save(
-            new VehicleStateChange(
-                BIKE_ID, VehicleState.AVAILABLE, VehicleState.DEACTIVATED, T0));
+            new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.DEACTIVATED, T0));
   }
 
   /** BR16: a forbidden transition is refused and not recorded in the history. */
@@ -216,9 +214,7 @@ class VehicleLifecycleUseCaseTest {
 
     assertThat(useCase.startMove(BIKE_ID)).isEqualTo(bikeInTransit());
     verify(history)
-        .save(
-            new VehicleStateChange(
-                BIKE_ID, VehicleState.AVAILABLE, VehicleState.IN_TRANSIT, T0));
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.IN_TRANSIT, T0));
   }
 
   @Test
@@ -232,9 +228,7 @@ class VehicleLifecycleUseCaseTest {
         .isEqualTo(
             new Vehicle(BIKE_ID, BIKE_CODE, VehicleType.E_BIKE, VehicleState.AVAILABLE, HUB_05_ID));
     verify(history)
-        .save(
-            new VehicleStateChange(
-                BIKE_ID, VehicleState.IN_TRANSIT, VehicleState.AVAILABLE, T0));
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.IN_TRANSIT, VehicleState.AVAILABLE, T0));
   }
 
   @Test
@@ -275,8 +269,7 @@ class VehicleLifecycleUseCaseTest {
     vehicleSaveReturnsWhatItGets();
 
     assertThat(useCase.retire(BIKE_ID))
-        .isEqualTo(
-            new Vehicle(BIKE_ID, BIKE_CODE, VehicleType.E_BIKE, VehicleState.RETIRED, null));
+        .isEqualTo(new Vehicle(BIKE_ID, BIKE_CODE, VehicleType.E_BIKE, VehicleState.RETIRED, null));
     verify(history)
         .save(new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.RETIRED, T0));
   }
@@ -301,8 +294,7 @@ class VehicleLifecycleUseCaseTest {
   void history_unknownVehicle_isNotFound() {
     when(vehicles.findById(BIKE_ID)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> useCase.history(BIKE_ID))
-        .isInstanceOf(VehicleNotFoundException.class);
+    assertThatThrownBy(() -> useCase.history(BIKE_ID)).isInstanceOf(VehicleNotFoundException.class);
   }
 
   @Test

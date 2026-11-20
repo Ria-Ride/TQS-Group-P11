@@ -94,8 +94,7 @@ class HubPersistenceAdapterIT {
   @Test
   void save_secondHubWithTheSameCode_isRefused() {
     hubs.save(HUB_03);
-    Hub sameCode =
-        new Hub(HUB_05_ID, FleetCode.of("hub-03"), "Fórum Aveiro", HUB_05.position(), 5);
+    Hub sameCode = new Hub(HUB_05_ID, FleetCode.of("hub-03"), "Fórum Aveiro", HUB_05.position(), 5);
 
     // Bypasses existsByCode, as two concurrent registrations would.
     assertThatThrownBy(() -> hubs.save(sameCode)).isInstanceOf(HubCodeAlreadyInUseException.class);
@@ -130,12 +129,11 @@ class HubPersistenceAdapterIT {
   /** BR14 also holds for rows edited directly in the database. */
   @Test
   void database_refusesACapacityBelowOne() {
-    assertThatThrownBy(
-            () ->
-                jdbc.update(
-                    "INSERT INTO hubs (id, code, name, latitude, longitude, capacity)"
-                        + " VALUES (?, 'hub-03', 'Canal Central', 40.6405, -8.6538, 0)",
-                    HUB_03_ID))
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "INSERT INTO hubs (id, code, name, latitude, longitude, capacity)"
+                    + " VALUES (?, 'hub-03', 'Canal Central', 40.6405, -8.6538, 0)",
+                HUB_03_ID))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

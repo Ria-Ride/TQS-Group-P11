@@ -46,11 +46,10 @@ class VehicleStateTest {
 
   static Stream<Arguments> forbiddenTransitions() {
     return Arrays.stream(VehicleState.values())
-        .flatMap(
-            state ->
-                Arrays.stream(VehicleAction.values())
-                    .filter(action -> !isAllowed(state, action))
-                    .map(action -> arguments(state, action)));
+        .flatMap(state ->
+            Arrays.stream(VehicleAction.values())
+                .filter(action -> !isAllowed(state, action))
+                .map(action -> arguments(state, action)));
   }
 
   private static boolean isAllowed(VehicleState state, VehicleAction action) {

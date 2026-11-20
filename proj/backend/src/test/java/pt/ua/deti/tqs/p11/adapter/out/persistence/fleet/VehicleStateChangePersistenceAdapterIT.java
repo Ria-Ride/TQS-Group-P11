@@ -67,8 +67,7 @@ class VehicleStateChangePersistenceAdapterIT {
     history.save(activation);
     history.save(move);
 
-    assertThat(history.findByVehicleId(BIKE_09_ID))
-        .containsExactly(registration, activation, move);
+    assertThat(history.findByVehicleId(BIKE_09_ID)).containsExactly(registration, activation, move);
   }
 
   /** With a fixed clock in tests, several changes can share the same instant. */

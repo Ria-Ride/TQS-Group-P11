@@ -48,10 +48,8 @@ class VehicleStateChangeTest {
 
   @Test
   void new_sameStateOnBothSides_isRejected() {
-    assertThatThrownBy(
-            () ->
-                new VehicleStateChange(
-                    VEHICLE_ID, VehicleState.AVAILABLE, VehicleState.AVAILABLE, AT))
+    assertThatThrownBy(() ->
+            new VehicleStateChange(VEHICLE_ID, VehicleState.AVAILABLE, VehicleState.AVAILABLE, AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

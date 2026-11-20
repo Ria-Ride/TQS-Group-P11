@@ -46,7 +46,6 @@ class HubJpaEntity {
   }
 
   Hub toDomain() {
-    return new Hub(
-        id, FleetCode.of(code), name, new GeoPosition(latitude, longitude), capacity);
+    return new Hub(id, FleetCode.of(code), name, new GeoPosition(latitude, longitude), capacity);
   }
 }

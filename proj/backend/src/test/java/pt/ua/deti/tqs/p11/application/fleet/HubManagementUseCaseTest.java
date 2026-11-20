@@ -30,7 +30,8 @@ class HubManagementUseCaseTest {
   private static final UUID HUB_05_ID = UUID.fromString("2b3c4d5e-0000-4000-8000-000000000105");
   private static final FleetCode HUB_03_CODE = FleetCode.of("hub-03");
   private static final GeoPosition CANAL_CENTRAL = new GeoPosition(40.6405, -8.6538);
-  private static final Hub HUB_03 = new Hub(NEW_ID, HUB_03_CODE, "Canal Central", CANAL_CENTRAL, 10);
+  private static final Hub HUB_03 =
+      new Hub(NEW_ID, HUB_03_CODE, "Canal Central", CANAL_CENTRAL, 10);
   private static final Hub HUB_05 =
       new Hub(
           HUB_05_ID,

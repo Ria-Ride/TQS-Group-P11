@@ -47,17 +47,16 @@ public class VehicleLifecycleUseCase {
   /** BR14, BR16: a new vehicle is Deactivated at a hub with a free slot. */
   public Vehicle register(RegisterVehicleCommand command) {
     FleetCode code = FleetCode.of(command.code());
-    return transactions.inTransaction(
-        () -> {
-          if (vehicles.existsByCode(code)) {
-            throw new VehicleCodeAlreadyInUseException(code);
-          }
-          Hub hub = lockHubWithFreeSlot(command.hubId());
-          Vehicle vehicle =
-              vehicles.save(Vehicle.register(idGenerator.get(), code, command.type(), hub.id()));
-          history.save(VehicleStateChange.registration(vehicle.id(), clock.instant()));
-          return vehicle;
-        });
+    return transactions.inTransaction(() -> {
+      if (vehicles.existsByCode(code)) {
+        throw new VehicleCodeAlreadyInUseException(code);
+      }
+      Hub hub = lockHubWithFreeSlot(command.hubId());
+      Vehicle vehicle =
+          vehicles.save(Vehicle.register(idGenerator.get(), code, command.type(), hub.id()));
+      history.save(VehicleStateChange.registration(vehicle.id(), clock.instant()));
+      return vehicle;
+    });
   }
 
   /** BR16: activation needs no open maintenance ticket. */
@@ -106,9 +105,7 @@ public class VehicleLifecycleUseCase {
   }
 
   public Vehicle get(UUID vehicleId) {
-    return vehicles
-        .findById(vehicleId)
-        .orElseThrow(() -> new VehicleNotFoundException(vehicleId));
+    return vehicles.findById(vehicleId).orElseThrow(() -> new VehicleNotFoundException(vehicleId));
   }
 
   /**
@@ -117,16 +114,15 @@ public class VehicleLifecycleUseCase {
    * hub, always in that order, so two operations never wait for each other.
    */
   private Vehicle change(UUID vehicleId, UnaryOperator<Vehicle> transition) {
-    return transactions.inTransaction(
-        () -> {
-          Vehicle before =
-              vehicles
-                  .findByIdForUpdate(vehicleId)
-                  .orElseThrow(() -> new VehicleNotFoundException(vehicleId));
-          Vehicle after = vehicles.save(transition.apply(before));
-          history.save(VehicleStateChange.between(before, after, clock.instant()));
-          return after;
-        });
+    return transactions.inTransaction(() -> {
+      Vehicle before =
+          vehicles
+              .findByIdForUpdate(vehicleId)
+              .orElseThrow(() -> new VehicleNotFoundException(vehicleId));
+      Vehicle after = vehicles.save(transition.apply(before));
+      history.save(VehicleStateChange.between(before, after, clock.instant()));
+      return after;
+    });
   }
 
   private Hub lockHubWithFreeSlot(UUID hubId) {

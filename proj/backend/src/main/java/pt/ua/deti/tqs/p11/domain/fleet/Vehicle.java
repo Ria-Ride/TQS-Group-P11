@@ -59,8 +59,8 @@ public record Vehicle(UUID id, FleetCode code, VehicleType type, VehicleState st
   }
 
   /**
-   * Applies the lifecycle table. The vehicle is at hubAfter if the new state is at a hub, and at
-   * no hub otherwise.
+   * Applies the lifecycle table. The vehicle is at hubAfter if the new state is at a hub, and at no
+   * hub otherwise.
    */
   private Vehicle transition(VehicleAction action, UUID hubAfter) {
     VehicleState next = state.after(action);

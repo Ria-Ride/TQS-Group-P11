@@ -44,7 +44,8 @@ class HubApiIT {
     jdbc.update("DELETE FROM hubs");
     jdbc.update("DELETE FROM users");
     RestClient http = ApiClient.forPort(port);
-    Registered rui = ApiClient.registerGuest(http, "Rui Costa", "rui.costa@example.com", "Passw0rd!");
+    Registered rui =
+        ApiClient.registerGuest(http, "Rui Costa", "rui.costa@example.com", "Passw0rd!");
     jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE id = ?", rui.id());
     operator = new FleetApi(http, rui.token());
   }
@@ -169,9 +170,7 @@ class HubApiIT {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody())
         .extracting(hub -> hub.get("code"), hub -> hub.get("vehiclesHeld"))
-        .containsExactly(
-            tuple("hub-03", 0),
-            tuple("hub-05", 2));
+        .containsExactly(tuple("hub-03", 0), tuple("hub-05", 2));
   }
 
   @Test

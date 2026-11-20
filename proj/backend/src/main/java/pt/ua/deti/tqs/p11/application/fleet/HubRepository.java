@@ -19,8 +19,8 @@ public interface HubRepository {
   Optional<Hub> findById(UUID id);
 
   /**
-   * Finds the hub and locks it until the current transaction ends, so that two operations that
-   * add a vehicle to the same hub run one after the other and cannot both take its last free slot
+   * Finds the hub and locks it until the current transaction ends, so that two operations that add
+   * a vehicle to the same hub run one after the other and cannot both take its last free slot
    * (BR14, K3). Must be called inside a transaction.
    */
   Optional<Hub> findByIdForUpdate(UUID id);

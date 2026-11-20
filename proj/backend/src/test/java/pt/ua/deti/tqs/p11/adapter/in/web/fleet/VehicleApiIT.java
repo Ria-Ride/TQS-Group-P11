@@ -47,7 +47,8 @@ class VehicleApiIT {
     jdbc.update("DELETE FROM hubs");
     jdbc.update("DELETE FROM users");
     RestClient http = ApiClient.forPort(port);
-    Registered rui = ApiClient.registerGuest(http, "Rui Costa", "rui.costa@example.com", "Passw0rd!");
+    Registered rui =
+        ApiClient.registerGuest(http, "Rui Costa", "rui.costa@example.com", "Passw0rd!");
     jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE id = ?", rui.id());
     operator = new FleetApi(http, rui.token());
     hub03 = operator.hub("hub-03", 10);
@@ -181,7 +182,9 @@ class VehicleApiIT {
     ResponseEntity<Map<String, Object>> response = operator.transition(bike, "START_MOVE");
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody()).containsEntry("state", "IN_TRANSIT").containsEntry("hubId", null);
+    assertThat(response.getBody())
+        .containsEntry("state", "IN_TRANSIT")
+        .containsEntry("hubId", null);
   }
 
   @Test

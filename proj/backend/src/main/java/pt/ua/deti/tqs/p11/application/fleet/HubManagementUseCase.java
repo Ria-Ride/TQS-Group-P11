@@ -49,12 +49,11 @@ public class HubManagementUseCase {
 
   /** BR14: refused below the vehicles held, counted while the hub is locked. */
   public HubOccupancy changeCapacity(UUID hubId, int capacity) {
-    return transactions.inTransaction(
-        () -> {
-          Hub hub = hubs.findByIdForUpdate(hubId).orElseThrow(() -> new HubNotFoundException(hubId));
-          int held = vehicles.countAtHub(hubId);
-          return new HubOccupancy(hubs.save(hub.withCapacity(capacity, held)), held);
-        });
+    return transactions.inTransaction(() -> {
+      Hub hub = hubs.findByIdForUpdate(hubId).orElseThrow(() -> new HubNotFoundException(hubId));
+      int held = vehicles.countAtHub(hubId);
+      return new HubOccupancy(hubs.save(hub.withCapacity(capacity, held)), held);
+    });
   }
 
   /** One count per hub: fine for a fleet of a few dozen hubs. */
