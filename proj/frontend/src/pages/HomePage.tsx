@@ -53,11 +53,18 @@ export function HomePage() {
           <>
             <h1>Hello, {profile.name}</h1>
             <p className="muted">You are logged in as {profile.email}.</p>
-            {profile.role === "ADMIN" && (
-              <Link className="button" to="/admin/users">
-                Manage accounts
-              </Link>
-            )}
+            <div className="home-actions">
+              {(profile.role === "OPERATOR" || profile.role === "ADMIN") && (
+                <Link className="button" to="/operator/fleet">
+                  Manage fleet
+                </Link>
+              )}
+              {profile.role === "ADMIN" && (
+                <Link className="button" to="/admin/users">
+                  Manage accounts
+                </Link>
+              )}
+            </div>
           </>
         )}
         {!profile && error && (

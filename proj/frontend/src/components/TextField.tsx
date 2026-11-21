@@ -3,6 +3,8 @@ interface TextFieldProps {
   label: string;
   type?: "text" | "email" | "password";
   autoComplete?: string;
+  /** Which keyboard phones show, e.g. "decimal" for coordinates. */
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   value: string;
   onChange: (value: string) => void;
   error?: string;
@@ -15,6 +17,7 @@ export function TextField({
   label,
   type = "text",
   autoComplete,
+  inputMode,
   value,
   onChange,
   error,
@@ -29,6 +32,7 @@ export function TextField({
         name={id}
         type={type}
         autoComplete={autoComplete}
+        inputMode={inputMode}
         value={value}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
