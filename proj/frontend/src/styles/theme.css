@@ -264,3 +264,69 @@ a:hover {
 .row-actions .field-error {
   white-space: normal;
 }
+/* US08: fleet page */
+.card-wide h2 {
+  margin: 28px 0 8px;
+  font-size: 1.25rem;
+}
+
+.card-wide h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.fleet-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fleet-table th,
+.fleet-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-sal);
+  vertical-align: top;
+}
+
+.fleet-table select,
+.inline-input {
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.inline-input {
+  width: 5rem;
+}
+
+.fleet-table .row-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.history {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.history time {
+  margin-left: 0.25rem;
+}

@@ -29,17 +29,16 @@ classDiagram
   class DepositRate {
     amount
   }
-  class HubCapacity {
-    capacity
-  }
   class ServiceLevel {
     maxRepairHours
     availabilityTarget
   }
   class Hub {
+    code
     name
     latitude
     longitude
+    capacity
   }
   class Vehicle {
     code
@@ -93,8 +92,6 @@ classDiagram
   Client "1" --> "1" RulesOfUse : sets
   Client "1" --> "1" ServiceLevel : contracts
   Client "1" --> "1..*" Hub : owns
-  RulesOfUse "1" --> "0..*" HubCapacity : configures
-  HubCapacity "0..*" --> "1" Hub : limits
   RulesOfUse "1" --> "1..*" DepositRate : configures
   DepositRate "0..*" --> "1" VehicleType : per type
   Hub "0..1 current hub" --> "0..*" Vehicle : holds
@@ -169,6 +166,7 @@ classDiagram
     type
   }
   class Hub {
+    code
     name
   }
   class Payment {
@@ -212,13 +210,12 @@ classDiagram
 | Client | Client Rules and KPIs | The institution that contracts the service (the hotel group). Owns the hubs, sets the rules and issues the stay codes of its partner accommodations |
 | RulesOfUse | Client Rules and KPIs | Configuration the client edits: maximum booking duration, minimum battery to book, start window of a reservation, repositioning window after a refused return, and the overtime parameters (grace period, block length, rate per block) |
 | DepositRate | Client Rules and KPIs | Deposit amount for one vehicle type |
-| HubCapacity | Client Rules and KPIs | How many vehicles one hub holds, as configured by the client. Fleet reads it when a vehicle is registered, returned or relocated |
 | ServiceLevel | Client Rules and KPIs | The contracted SLA: maximum repair time for maintenance tickets and the availability target used by the KPIs |
-| Hub | Fleet | A place where vehicles are picked up and returned, with a location. Its capacity comes from HubCapacity |
-| Vehicle | Fleet | A fleet vehicle: type, lifecycle state, last known battery level and lock state. Held by one hub, or by none while in use or in transit |
+| Hub | Fleet | A place where vehicles are picked up and returned: a code, a name, a location and a capacity. It holds at most `capacity` vehicles (BR14). Operators register hubs and change the capacity (US08); client managers can change it too (US14) |
+| Vehicle | Fleet | A fleet vehicle: code, type, lifecycle state, last known battery level and lock state. Held by one hub, or by none while in use, in transit or retired |
 | VehicleType | Fleet | E_BIKE, E_SCOOTER |
 | VehicleReading | Fleet | A telemetry reading about a vehicle: battery, position or hub, lock state, fault code, timestamp. Applied to the vehicle; readings are not kept as business data |
-| VehicleStateChange | Fleet | One entry in a vehicle's state history (from, to, when). It is the source of the availability and utilization KPIs |
+| VehicleStateChange | Fleet | One entry in a vehicle's state history (from, to, when); `from` is empty for the registration. It is the source of the availability and utilization KPIs |
 | MaintenanceTicket | Maintenance | A repair job for one vehicle and fault, opened automatically from a fault reading or manually by an operator, with an SLA deadline, an optional technician, and a record of the work done when closed. Time to repair is measured from it |
 | PartnerAccommodation | Passes and Booking | A hotel or accommodation of the client's group whose guests receive a discount |
 | Stay | Passes and Booking | A guest's stay at a partner accommodation, identified by a code issued by the client. The guest enters the code when buying a pass. A code links to one account only and is valid for purchases between check-in and check-out |
@@ -228,6 +225,8 @@ classDiagram
 | Payment | Billing | A money movement: the payment of a pass, or the deposit of a booking. A deposit is authorized, then captured up to the overtime charge and released for the rest |
 | Route | Routes (low priority) | A suggested route through an ordered sequence of hubs |
 | Notification | Notifications (low priority) | A message sent to an account (confirmation, reminder, SLA alert, cancellation) |
+
+Hub and vehicle codes follow the identifier format of the telemetry contract (letters, digits, `-` and `_`, 1 to 64 characters), so they are also the hub and vehicle ids of the fleet simulator. Each code is unique and stays taken after a vehicle is retired.
 
 Key derived values, not stored as concepts: the booking's overtime and charge breakdown, the business KPIs (utilization, availability against the SLA, bookings per day, time to repair) and the technical KPIs (API latency, error rate, telemetry lag).
 
@@ -260,7 +259,7 @@ stateDiagram-v2
   Retired --> [*]
 ```
 
-A vehicle is **bookable** only in Available, and then only if its battery is at or above the minimum. A vehicle in InTransit is being moved between hubs by the operator and belongs to no hub.
+A vehicle is **bookable** only in Available, and then only if its battery is at or above the minimum. A vehicle in InTransit is being moved between hubs by the operator and belongs to no hub. A Retired vehicle leaves its hub too, so the vehicles a hub holds (BR14) are exactly those whose current hub it is: Deactivated, Available, Reserved and Maintenance.
 
 | From | To | Trigger | Condition |
 |------|----|---------|-----------|

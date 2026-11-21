@@ -99,11 +99,11 @@ Solid arrows are calls (dependency direction). Dependencies between modules form
 | Module | Responsibility |
 |--------|----------------|
 | Accounts and Access | Guest and registered accounts, roles (end user, operator with an optional `fieldTechnician` flag, client manager, admin), authentication |
-| Fleet | Vehicles, hubs, vehicle lifecycle, relocation of vehicles between hubs (rebalancing), applying telemetry readings, state history. The only module that changes vehicle state: it checks state, minimum battery and hub capacity inside one atomic operation. Reads hub capacity and minimum battery from Client Rules |
+| Fleet | Vehicles, hubs, vehicle lifecycle, relocation of vehicles between hubs (rebalancing), applying telemetry readings, state history, hub capacities. The only module that changes vehicle state: it checks state, minimum battery and hub capacity inside one atomic operation, locking the vehicle and then the hub. Reads the minimum battery from Client Rules |
 | Passes and Booking | Pass types and passes, stay codes issued by the client and redeemed by guests, bookings and immediate starts, ending a booking at a hub, expiry and cancellation. Reads which vehicle types a pass allows from Client Rules |
 | Billing | Pass price and stay discount, pass payment, deposit authorization, overtime charge, capture and release of the deposit; talks to the payment gateway through `PaymentPort` |
 | Maintenance | Maintenance tickets with SLA deadlines, assignment to field technicians, closing. Two entry points: the `VehicleFaultReported` event, and a REST endpoint for operators (faults the simulator cannot detect). A vehicle cannot have two open tickets for the same fault: a manual ticket on a covered fault links to the existing ticket or is refused |
-| Client Rules and KPIs | Configuration set by the client: maximum booking duration, minimum battery, hub capacities, vehicle types per pass type, deposit amounts, overtime and window parameters, SLA targets. Also the business and technical KPIs |
+| Client Rules and KPIs | Configuration set by the client: maximum booking duration, minimum battery, vehicle types per pass type, deposit amounts, overtime and window parameters, SLA targets. Also the business and technical KPIs |
 | Routes (low priority) | Suggested routes between hubs |
 | Notifications (low priority) | Booking confirmation, end-of-use reminder, SLA breach alert, booking cancellation |
 
