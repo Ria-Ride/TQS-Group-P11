@@ -1,6 +1,7 @@
-# Team AI Policy — TQS Group P11 (DRAFT v0.1)
+# Team AI Policy — TQS Group P11 (v0.2, KAN-52)
 
-Status: **draft, not yet approved.** Approval = all four members approve the PR that merges this file (record names/dates below).
+Status: **v0.1 was approved; v0.2 (KAN-52) is a revision and needs all four members to approve the PR that merges it** (see section 9).
+Changes in v0.2: defined how AI-produced changes are marked (section 5), added newcomer advice (section 8), fixed where AI review findings are recorded.
 Companion files: [AGENTS.md](../AGENTS.md) (agent instructions), QA Manual sections 6.1–6.6.
 Course rules (guidelines 6.2) apply in addition and win on conflict.
 
@@ -53,7 +54,14 @@ Course rules (guidelines 6.2) apply in addition and win on conflict.
   - ID = first letter of username + zero-padded sequence number, always increasing, never reused (`F001`, `F002`, ...). Log is **append-only across days**: entries from the current day may still be corrected; entries from earlier days are frozen, and corrections to them are new entries.
   - `localDocs/` is git-ignored (private). An iteration summary can be exported to `docs/ai-log/<initial>.md` **only on the member's command**.
   - Written by the human. Describe AI contribution **conservatively and specifically**; do not let the AI write a flattering account of itself.
-- **AI review findings**: accepted/rejected + reason **[TBD location: PR template table]**.
+- **Marking AI-produced changes (for AI5).** Git history carries no AI marker, so the log is the only record. Every log row that concerns a change must start the "What the AI did" cell with two tags: the Jira key and one contribution level, for example `[KAN-52][mostly-AI] drafted the first version of section 5; user rewrote the marking rules`.
+  - `[mostly-AI]`: the AI wrote most of the lines of the final change (rough guide: more than half of the diff) and the human mainly reviewed, tested and corrected it.
+  - `[AI-assisted]`: the human wrote the change and the AI helped (suggestions, review, explanation, small snippets, tests drafted then rewritten).
+  - No tag needed when the AI was not used; a row exists only for AI use.
+  - Put the PR number in the same cell once it is known (`PR #12`), so one change can be traced from the log to the PR and its commits.
+  - When unsure between two levels, pick the higher AI share. Honest over flattering (principle 4).
+  - The QA Engineer builds the AI5 numbers from these tags. Members export their summary to `docs/ai-log/<initial>.md` (on their own command, see above) before each QA checkpoint, so the numbers can be checked by the team.
+- **AI review findings**: one row per finding in the "AI review findings" table of the PR template (`finding | accepted/rejected | reason`). The human fills and checks the table before the PR is opened.
 - **Declaration of AI use** (one for the project, QA Manual 6.2): tool/model, used for, how verified. QA Engineer consolidates from the logs.
 - **AI5 data** (QA Manual 6.6): share of AI-assisted changes, findings accepted/rejected, defects/rework traced to AI, gate failures on AI changes. Derived from the logs; so logs must be kept current (updated per work session, before the PR is opened).
 
@@ -71,6 +79,18 @@ Course rules (guidelines 6.2) apply in addition and win on conflict.
 
 First time: discuss at team checkpoint, fix, update log. Repeated or concealment: raise with teaching staff per course rules.
 
-## 8. Approval
+## 8. Advice for newcomers
 
-Approval of this policy is recorded by the GitHub approvals of the pull request that merges it (PR #1). Each member approves on GitHub after reading it; the approvers and dates are the PR history.
+1. **Read first**: this policy, then [AGENTS.md](../AGENTS.md). Your AI tool reads AGENTS.md too, so it should already know the rules; check it did.
+2. **Understand before you commit.** If you cannot explain a line to a teammate, ask the AI to explain it in simple words, or rewrite it yourself. You may be asked at a checkpoint.
+3. **Ask the AI for options, not answers.** For any real choice (library, design, schema) ask for 2-4 options with trade-offs, then you decide.
+4. **Tests first.** Write or review the failing test before any implementation. Break the code on purpose to check the test can fail.
+5. **Give it synthetic data only.** Never paste secrets, `.env` files, tokens or real personal data into a prompt.
+6. **Keep changes small.** One story, one branch, small PRs. A huge AI-generated diff is hard to review and hard to explain.
+7. **Never let an agent commit, push, merge or open a PR on its own.** Read the proposed commit message and PR text, edit them, then act yourself.
+8. **Write your log row the same day**, with the Jira key and the contribution tag (section 5). Describe only what the AI actually did.
+9. **Stuck or unsure whether a use is allowed?** Ask the QA Engineer or the team before doing it. Asking is never a breach; hiding is.
+
+## 9. Approval
+
+Approval of this policy is recorded by the GitHub approvals of the pull request that merges it. Each member approves on GitHub after reading it; the approvers and dates are the PR history. v0.1 was approved through PR #1; v0.2 (KAN-52) needs a new round of approvals.
