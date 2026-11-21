@@ -92,4 +92,35 @@ describe("home page", () => {
     await screen.findByRole("heading", { name: "Hello, Ana Sousa" });
     expect(screen.queryByRole("link", { name: "Manage accounts" })).not.toBeInTheDocument();
   });
+
+  it("offers fleet management to an operator", async () => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Rui Costa",
+      email: "rui.costa@example.com",
+      role: "OPERATOR",
+    });
+    renderApp("/");
+
+    expect(await screen.findByRole("link", { name: "Manage fleet" })).toHaveAttribute(
+      "href",
+      "/operator/fleet",
+    );
+    expect(screen.queryByRole("link", { name: "Manage accounts" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer fleet management to a tourist", async () => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Ana Sousa",
+      email: "ana.sousa@example.com",
+      role: "END_USER",
+    });
+    renderApp("/");
+
+    await screen.findByRole("heading", { name: "Hello, Ana Sousa" });
+    expect(screen.queryByRole("link", { name: "Manage fleet" })).not.toBeInTheDocument();
+  });
 });
