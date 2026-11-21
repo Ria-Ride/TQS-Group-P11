@@ -1,20 +1,19 @@
-import { useEffect, useState } from "react";
+import { Navigate, Route, Routes } from "react-router";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { FleetPage } from "./pages/FleetPage";
+import { HomePage } from "./pages/HomePage";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
 
-// Walking skeleton: shows whether the frontend reaches the backend and the backend reaches the database.
 export default function App() {
-  const [status, setStatus] = useState("checking...");
-
-  useEffect(() => {
-    fetch("/api/actuator/health")
-      .then((response) => response.json())
-      .then((body: { status: string }) => setStatus(body.status))
-      .catch(() => setStatus("unreachable"));
-  }, []);
-
   return (
-    <main>
-      <h1>TQS P11</h1>
-      <p>Backend status: {status}</p>
-    </main>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/admin/users" element={<AdminUsersPage />} />
+      <Route path="/operator/fleet" element={<FleetPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

@@ -1,0 +1,332 @@
+/* Ria Ride brand palette and type. Contrast checked against WCAG AA (see comments). */
+:root {
+  --color-ria: #0e4f63; /* Azul Ria: text and primary button (white on it ≈ 9:1) */
+  --color-agua: #7fc8d6; /* Azul Água: decoration only, never text on white (≈ 1.9:1) */
+  --color-moliceiro: #e2632b; /* Laranja Moliceiro: accent and focus ring, large text only */
+  --color-sal: #e6e8e5; /* Cinzento Sal: page background */
+  --color-surface: #ffffff;
+  --color-text: var(--color-ria);
+  --color-text-muted: #3f5f69; /* ≈ 6.9:1 on white */
+  --color-border: #6b8790; /* ≈ 3.8:1 on white, enough for input borders */
+  --color-error: #b42318; /* ≈ 6.6:1 on white; distinct from the brand orange */
+  --color-error-surface: #fef3f2;
+  --font-body: "Outfit", system-ui, sans-serif;
+  --radius-card: 20px;
+  --radius-control: 10px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-sal);
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+a {
+  color: var(--color-ria);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-moliceiro);
+  outline-offset: 2px;
+}
+
+/* Layout: one centred column, comfortable on a 360 px phone. */
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-height: 100dvh;
+  padding: 24px 16px;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 24px;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 3px rgb(14 79 99 / 10%);
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-mark {
+  flex: none;
+  width: 56px;
+  height: 56px;
+}
+
+.logo-word {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.logo-ria {
+  color: var(--color-ria);
+}
+
+.logo-ride {
+  color: var(--color-moliceiro); /* bold 32 px: large text, ≈ 4.1:1 is above the 3:1 needed */
+}
+
+.logo-tagline {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+}
+
+/* Forms */
+.form {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field label {
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  font: inherit; /* 16 px or more: phones do not zoom in on focus */
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+
+.field-error {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-error);
+}
+
+.form-error {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--color-error);
+  background: var(--color-error-surface);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-control);
+}
+
+.button {
+  min-height: 48px;
+  padding: 12px 20px;
+  font: inherit;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--color-ria);
+  border: 2px solid var(--color-ria);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #0b3f4f;
+}
+
+.button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.button-secondary {
+  color: var(--color-ria);
+  background: transparent;
+}
+
+.button-secondary:hover {
+  color: #ffffff;
+}
+
+.switch {
+  margin: 20px 0 0;
+  text-align: center;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+@media (min-width: 640px) {
+  .card {
+    padding: 36px 40px;
+  }
+}
+
+/* US13: account management page */
+.card-wide {
+  max-width: 1120px;
+  width: 100%;
+}
+
+.field select {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Wide tables scroll inside the card, so the page itself never scrolls sideways on a phone. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.accounts {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.accounts th,
+.accounts td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-sal);
+  vertical-align: middle;
+}
+
+.accounts select {
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+.button-small {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Keep each cell on one line; the table scrolls inside the card when it does not fit. */
+.accounts .checkbox,
+.accounts td:nth-child(5),
+.row-actions {
+  white-space: nowrap;
+}
+
+.row-actions .field-error {
+  white-space: normal;
+}
+/* US08: fleet page */
+.card-wide h2 {
+  margin: 28px 0 8px;
+  font-size: 1.25rem;
+}
+
+.card-wide h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.fleet-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fleet-table th,
+.fleet-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-sal);
+  vertical-align: top;
+}
+
+.fleet-table select,
+.inline-input {
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.inline-input {
+  width: 5rem;
+}
+
+.fleet-table .row-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.history {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.history time {
+  margin-left: 0.25rem;
+}
