@@ -1,7 +1,9 @@
 # Build and test on every push and pull request.
 # A part that has no code yet is skipped with a notice, so a green run says nothing about it.
 # Backend also runs mutation testing (pull requests) and SonarCloud analysis with the quality gate
-# (pull requests from this repository, and main). Not here yet: simulator (stack TBD), E2E.
+# (pull requests from this repository, and main). The backend job is a required check on main, so a
+# pull request that fails the gate cannot be merged. The simulator has its own repository and CI.
+# E2E and load tests are in extended-tests.yml, outside the default build.
 name: CI
 
 on:
@@ -16,6 +18,13 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     env:
+      # 'true' where the quality gate must run: pushes to main and pull requests from this
+      # repository (Dependabot included, it reads SONAR_TOKEN from the Dependabot secrets).
+      # Pull requests from forks get no secrets, so they cannot run it.
+      RUNS_SONAR: >-
+        ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository) }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - uses: actions/checkout@v7
@@ -46,16 +55,23 @@ jobs:
         working-directory: proj/backend
         run: ./mvnw -B test-compile pitest:mutationCoverage
 
+      # Without the token the gate would be skipped and the job would pass, so a missing secret
+      # fails the build instead of silently turning the gate off.
       - name: SonarCloud token missing
-        if: hashFiles('proj/backend/pom.xml') != '' && env.SONAR_TOKEN == ''
-        run: echo "::notice::SONAR_TOKEN is not available (secret missing or pull request from a fork), SonarCloud analysis skipped"
+        if: hashFiles('proj/backend/pom.xml') != '' && env.RUNS_SONAR == 'true' && env.SONAR_TOKEN == ''
+        run: |
+          echo "::error::SONAR_TOKEN is not set (Actions secret, or Dependabot secret for Dependabot pull requests), so the quality gate cannot run"
+          exit 1
+
+      - name: Pull request from a fork
+        if: >-
+          hashFiles('proj/backend/pom.xml') != '' && github.event_name == 'pull_request' &&
+          env.RUNS_SONAR != 'true'
+        run: echo "::notice::Pull request from a fork has no access to SONAR_TOKEN, SonarCloud analysis skipped"
 
       # Reads the JaCoCo report written by verify. Fails the build when the quality gate fails.
       - name: SonarCloud analysis and quality gate
-        if: >-
-          hashFiles('proj/backend/pom.xml') != '' && env.SONAR_TOKEN != '' &&
-          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        if: hashFiles('proj/backend/pom.xml') != '' && env.RUNS_SONAR == 'true'
         working-directory: proj/backend
         run: ./mvnw -B sonar:sonar -Dsonar.qualitygate.wait=true
 
@@ -83,3 +99,15 @@ jobs:
           npm run lint --if-present
           npm test --if-present
           npm run build
+
+      # Switches on by itself once package.json has a test:coverage script (Vitest with coverage,
+      # writing coverage/lcov.info). Sending it to SonarCloud is planned, see docs/sqa-tools.md.
+      - name: Coverage
+        if: hashFiles('proj/frontend/package.json') != ''
+        working-directory: proj/frontend
+        run: |
+          if [ "$(npm pkg get 'scripts.test:coverage')" = "{}" ]; then
+            echo "::notice::proj/frontend has no test:coverage script yet, frontend coverage not measured"
+          else
+            npm run test:coverage
+          fi

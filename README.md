@@ -1,6 +1,8 @@
 # TQS-Group-P11 — Ria Ride
 
-[![CI](https://github.com/Ria-Ride/TQS-Group-P11/actions/workflows/ci.yml/badge.svg)](https://github.com/Ria-Ride/TQS-Group-P11/actions/workflows/ci.yml)
+[![CI](https://github.com/Ria-Ride/TQS-Group-P11/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Ria-Ride/TQS-Group-P11/actions/workflows/ci.yml?query=branch%3Amain)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Ad-Qualquer-Coisa_TQS-Group-P11&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Ad-Qualquer-Coisa_TQS-Group-P11)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Ad-Qualquer-Coisa_TQS-Group-P11&metric=coverage)](https://sonarcloud.io/component_measures?id=Ad-Qualquer-Coisa_TQS-Group-P11&metric=coverage)
 
 ## 1. Project abstract
 

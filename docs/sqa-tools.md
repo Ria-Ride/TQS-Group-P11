@@ -23,14 +23,29 @@ Not adopted for now: SpotBugs (SonarCloud already reports the same bug patterns,
 
 ## Quality gate
 
-SonarCloud judges every pull request and `main`. The build fails when the gate fails.
+SonarCloud judges every pull request from this repository and every push to `main`. Dashboard: [SonarCloud project overview](https://sonarcloud.io/project/overview?id=Ad-Qualquer-Coisa_TQS-Group-P11). The README shows the gate and coverage of `main` as badges.
+
+The project uses a custom gate:
 
 | Scope | Condition |
 |-------|-----------|
-| New code | no new issues; coverage at least 80 %; duplicated lines at most 3 %; security hotspots 100 % reviewed |
+| New code | rating A for reliability (no new bugs), security (no new vulnerabilities) and maintainability (technical debt of new code at most 5 % of its development cost); coverage at least 80 %; duplicated lines at most 3 %; security hotspots 100 % reviewed |
 | Overall | coverage at least 80 %; duplicated lines at most 3 %; security hotspots 100 % reviewed; ratings A for reliability, security and maintainability |
 
-If SonarCloud's free plan does not allow a custom gate, its built-in "Sonar way" gate applies and the JaCoCo check in Maven remains the blocking gate for coverage.
+"New code" in a pull request is what the pull request changes; on `main` it is what changed since the previous analysis. The JaCoCo check in Maven (90 % on `domain` and `application`) is a second, stricter coverage gate that fails `verify` itself.
+
+How the gate blocks a merge:
+
+1. The CI `backend` job runs `./mvnw verify` (tests and JaCoCo report), then `./mvnw sonar:sonar -Dsonar.qualitygate.wait=true`. That step waits for SonarCloud's verdict and fails when the gate fails.
+2. The `protect-main` ruleset requires the `backend`, `frontend` and `dependency-review` checks to pass before a pull request can be merged, so a failed gate blocks the merge.
+3. When the gate has to run but `SONAR_TOKEN` is missing, the job fails instead of skipping the analysis, so the gate cannot be switched off by losing the secret. Dependabot pull requests read the token from the Dependabot secrets, so both secrets must hold it. Pull requests from forks get no secrets: they skip the analysis with a notice and are judged again on `main` after the merge.
+
+Failure notifications: GitHub e-mails the person who triggered a failed run (the pusher, or whoever merged into `main`). Each member enables it under GitHub *Settings → Notifications → Actions* ("Only notify for failed workflows"). SonarCloud also posts the gate result on each pull request.
+
+Not covered yet:
+
+- **Frontend analysis.** SonarCloud analyses only the backend (the Maven scanner sees `proj/backend`). CI already runs the frontend's `test:coverage` script once it exists. Planned: one SonarCloud project for both parts, with the generic scanner (`SonarSource/sonarqube-scan-action`) run from the repository root in place of the Maven scanner, reading the JaCoCo and the Vitest (lcov) reports.
+- **E2E and load tests** are in `.github/workflows/extended-tests.yml`, outside the gate: Playwright (`proj/e2e`) on `main` and manual runs, k6 (`proj/load`) on manual runs. Each job is skipped with a notice until its folder has code.
 
 ## Running the tools
 
@@ -41,4 +56,4 @@ cd proj/backend
 ./mvnw verify -Pmutation       # also run mutation testing (target/pit-reports/index.html)
 ```
 
-The JaCoCo report is `target/site/jacoco/index.html`. In CI, `verify` runs on every push and pull request, mutation testing on pull requests, and the SonarCloud analysis on pull requests from this repository and on `main`.
+The JaCoCo report is `target/site/jacoco/index.html`. In CI, `verify` runs on every push and pull request, mutation testing on pull requests, and the SonarCloud analysis on pull requests from this repository and on `main`. The E2E and load jobs start the whole stack with Docker Compose and a throwaway `.env` made by `scripts/ci-env.sh`.

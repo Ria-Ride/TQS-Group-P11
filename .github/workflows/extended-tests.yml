@@ -1,0 +1,95 @@
+# Tests outside the default build, against the whole stack started with Docker Compose:
+#   e2e   Playwright journeys in proj/e2e (T4): on every push to main and on manual runs.
+#   load  k6 scripts in proj/load (T5): on manual runs only, they are slow and noisy.
+# A part that has no code yet is skipped with a notice, and switches on by itself once its folder
+# has code. Neither job is a required check, so they never block a pull request.
+name: Extended tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: No E2E tests yet
+        if: hashFiles('proj/e2e/package.json') == ''
+        run: echo "::notice::proj/e2e has no package.json yet, E2E tests not run"
+
+      # Throwaway values for this run only; the stack is deleted at the end of the job.
+      - name: Create .env
+        if: hashFiles('proj/e2e/package.json') != ''
+        run: scripts/ci-env.sh
+
+      - name: Start the stack
+        if: hashFiles('proj/e2e/package.json') != ''
+        run: docker compose up --build --detach --wait
+
+      - uses: actions/setup-node@v7
+        if: hashFiles('proj/e2e/package.json') != ''
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: proj/e2e/package-lock.json
+
+      - name: Run E2E tests
+        if: hashFiles('proj/e2e/package.json') != ''
+        working-directory: proj/e2e
+        env:
+          BASE_URL: http://localhost
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          npx playwright test
+
+      - name: Keep the Playwright report
+        if: failure() && hashFiles('proj/e2e/package.json') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: proj/e2e/playwright-report/
+          retention-days: 7
+
+      - name: Stop the stack
+        if: always() && hashFiles('proj/e2e/package.json') != ''
+        run: docker compose down --volumes
+
+  load:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: No load tests yet
+        if: hashFiles('proj/load/*.js') == ''
+        run: echo "::notice::proj/load has no k6 scripts yet, load tests not run"
+
+      - name: Create .env
+        if: hashFiles('proj/load/*.js') != ''
+        run: scripts/ci-env.sh
+
+      - name: Start the stack
+        if: hashFiles('proj/load/*.js') != ''
+        run: docker compose up --build --detach --wait
+
+      # k6 fails the step when a script's thresholds (taken from the SLOs) are not met.
+      - name: Run load tests
+        if: hashFiles('proj/load/*.js') != ''
+        run: |
+          for script in proj/load/*.js; do
+            echo "::group::$script"
+            docker run --rm --network host -e BASE_URL=http://localhost \
+              -v "$PWD/proj/load:/scripts:ro" grafana/k6:2.4.0 run "/scripts/$(basename "$script")"
+            echo "::endgroup::"
+          done
+
+      - name: Stop the stack
+        if: always() && hashFiles('proj/load/*.js') != ''
+        run: docker compose down --volumes
