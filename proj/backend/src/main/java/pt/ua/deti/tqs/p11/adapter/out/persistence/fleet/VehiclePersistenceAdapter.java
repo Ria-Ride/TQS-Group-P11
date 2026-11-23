@@ -58,6 +58,13 @@ class VehiclePersistenceAdapter implements VehicleRepository {
   }
 
   @Override
+  public List<Vehicle> findAtHub(UUID hubId) {
+    return repository.findByHubIdOrderByCodeAsc(hubId).stream()
+        .map(VehicleJpaEntity::toDomain)
+        .toList();
+  }
+
+  @Override
   public List<Vehicle> findAll() {
     return repository.findAll(Sort.by("code")).stream().map(VehicleJpaEntity::toDomain).toList();
   }

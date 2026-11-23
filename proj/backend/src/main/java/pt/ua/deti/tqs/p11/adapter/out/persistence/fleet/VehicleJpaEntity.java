@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import pt.ua.deti.tqs.p11.domain.fleet.BatteryLevel;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleState;
@@ -36,6 +37,10 @@ class VehicleJpaEntity {
   @Column(name = "hub_id")
   private UUID hubId;
 
+  /** NULL until the first telemetry report. */
+  @Column(name = "battery_percent")
+  private Integer batteryPercent;
+
   /** For JPA only. */
   protected VehicleJpaEntity() {}
 
@@ -46,10 +51,12 @@ class VehicleJpaEntity {
     entity.type = vehicle.type();
     entity.state = vehicle.state();
     entity.hubId = vehicle.hubId();
+    entity.batteryPercent = vehicle.battery().map(BatteryLevel::percent).orElse(null);
     return entity;
   }
 
   Vehicle toDomain() {
-    return new Vehicle(id, FleetCode.of(code), type, state, hubId);
+    BatteryLevel battery = batteryPercent == null ? null : BatteryLevel.of(batteryPercent);
+    return new Vehicle(id, FleetCode.of(code), type, state, hubId, battery);
   }
 }
