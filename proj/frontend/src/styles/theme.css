@@ -330,3 +330,28 @@ a:hover {
 .history time {
   margin-left: 0.25rem;
 }
+
+/* US02: the search of a hub's vehicles */
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.search-filters .field {
+  flex: 1 1 12rem;
+}
+
+.fleet-table tr.unbookable {
+  color: var(--color-text-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

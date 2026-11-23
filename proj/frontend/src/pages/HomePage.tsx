@@ -54,6 +54,9 @@ export function HomePage() {
             <h1>Hello, {profile.name}</h1>
             <p className="muted">You are logged in as {profile.email}.</p>
             <div className="home-actions">
+              <Link className="button" to="/vehicles/search">
+                Find a vehicle
+              </Link>
               {(profile.role === "OPERATOR" || profile.role === "ADMIN") && (
                 <Link className="button" to="/operator/fleet">
                   Manage fleet

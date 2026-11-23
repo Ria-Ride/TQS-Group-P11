@@ -34,6 +34,32 @@ export interface Vehicle {
   hubId: string | null;
 }
 
+/** Why a vehicle in the search result cannot be booked (BR1, BR2). */
+export type UnbookableReason =
+  "NOT_AVAILABLE" | "NO_BATTERY_READING" | "LOW_BATTERY" | "INSUFFICIENT_FOR_DURATION";
+
+/**
+ * A vehicle in the search result of a hub (US02). batteryPercent is null before the first report.
+ * requiredBatteryPercent is what the ride asked for needs (the minimum when no length was given);
+ * it can be above 100 for a ride no battery can do.
+ */
+export interface HubVehicle {
+  id: string;
+  code: string;
+  type: VehicleType;
+  state: VehicleState;
+  batteryPercent: number | null;
+  requiredBatteryPercent: number;
+  bookable: boolean;
+  unbookableReason: UnbookableReason | null;
+}
+
+/** Null means "not set": the parameter is left out of the request. */
+export interface SearchFilters {
+  type: VehicleType | null;
+  minutes: number | null;
+}
+
 export interface NewVehicle {
   code: string;
   type: VehicleType;
@@ -93,6 +119,21 @@ export function transition(
 
 export function vehicleHistory(vehicleId: string, token: string): Promise<StateChange[]> {
   return requestJson<StateChange[]>(`/vehicles/${encodeURIComponent(vehicleId)}/history`, {
+    token,
+  });
+}
+
+/** US02: the vehicles a hub holds, each with whether it can be booked, for any logged-in role. */
+export function searchHubVehicles(
+  hubId: string,
+  filters: SearchFilters,
+  token: string,
+): Promise<HubVehicle[]> {
+  const query = new URLSearchParams();
+  if (filters.type !== null) query.set("type", filters.type);
+  if (filters.minutes !== null) query.set("minutes", String(filters.minutes));
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+  return requestJson<HubVehicle[]>(`/hubs/${encodeURIComponent(hubId)}/vehicles${suffix}`, {
     token,
   });
 }
