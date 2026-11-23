@@ -21,6 +21,7 @@
     <java.version>21</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <archunit.version>1.5.1</archunit.version>
+    <hivemq-mqtt-client.version>1.4.2</hivemq-mqtt-client.version>
     <jacoco.version>0.8.16</jacoco.version>
     <pitest.version>1.30.2</pitest.version>
     <pitest-junit5.version>1.2.3</pitest-junit5.version>
@@ -131,6 +132,13 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+    </dependency>
+    <!-- MQTT client of the telemetry adapter (US09). Same library and version as the simulator;
+         Apache-2.0, checked on Maven Central, no known vulnerabilities (OSV). -->
+    <dependency>
+      <groupId>com.hivemq</groupId>
+      <artifactId>hivemq-mqtt-client</artifactId>
+      <version>${hivemq-mqtt-client.version}</version>
     </dependency>
   </dependencies>
 

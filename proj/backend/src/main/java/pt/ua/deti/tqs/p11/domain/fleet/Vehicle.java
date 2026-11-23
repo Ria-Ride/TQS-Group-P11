@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.domain.fleet;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -9,7 +10,8 @@ import java.util.UUID;
  * A fleet vehicle and its place in the lifecycle (US08). Immutable: every transition returns a new
  * Vehicle, and the constructor checks the rules, so an invalid Vehicle cannot exist. hubId is the
  * hub the vehicle is at, or null when its state belongs to no hub (InUse, InTransit, Retired).
- * batteryLevel is the last level reported by telemetry, or null before the first report (US02).
+ * batteryLevel, lockState, position and lastReadingAt are what the last telemetry reading said
+ * (US09), and are null before the first report; position is also null while only the hub is known.
  */
 public record Vehicle(
     UUID id,
@@ -17,7 +19,10 @@ public record Vehicle(
     VehicleType type,
     VehicleState state,
     UUID hubId,
-    BatteryLevel batteryLevel) {
+    BatteryLevel batteryLevel,
+    LockState lockState,
+    GeoPosition position,
+    Instant lastReadingAt) {
 
   public Vehicle {
     Objects.requireNonNull(id, "id");
@@ -35,7 +40,18 @@ public record Vehicle(
 
   /** A vehicle with no battery reading yet. */
   public Vehicle(UUID id, FleetCode code, VehicleType type, VehicleState state, UUID hubId) {
-    this(id, code, type, state, hubId, null);
+    this(id, code, type, state, hubId, null, null, null, null);
+  }
+
+  /** A vehicle whose only reading is a battery level (tests and the search). */
+  public Vehicle(
+      UUID id,
+      FleetCode code,
+      VehicleType type,
+      VehicleState state,
+      UUID hubId,
+      BatteryLevel batteryLevel) {
+    this(id, code, type, state, hubId, batteryLevel, null, null, null);
   }
 
   /** A new vehicle starts Deactivated at the hub where it is registered (BR16). */
@@ -48,9 +64,67 @@ public record Vehicle(
     return Optional.ofNullable(batteryLevel);
   }
 
-  /** A newer reading replaces the older one; nothing else changes. */
+  /** The lock state of the last reading; empty until the first report. */
+  public Optional<LockState> lock() {
+    return Optional.ofNullable(lockState);
+  }
+
+  /** The last known position; empty until a reading brought one. */
+  public Optional<GeoPosition> lastPosition() {
+    return Optional.ofNullable(position);
+  }
+
+  /** The timestamp of the last reading applied; empty until the first one. */
+  public Optional<Instant> lastReading() {
+    return Optional.ofNullable(lastReadingAt);
+  }
+
+  /** Sets the battery level and changes nothing else. */
   public Vehicle withBattery(BatteryLevel level) {
-    return new Vehicle(id, code, type, state, hubId, Objects.requireNonNull(level, "level"));
+    return new Vehicle(
+        id,
+        code,
+        type,
+        state,
+        hubId,
+        Objects.requireNonNull(level, "level"),
+        lockState,
+        position,
+        lastReadingAt);
+  }
+
+  /** BR17: a reading is accepted only if its timestamp is newer than the last one applied. */
+  public boolean acceptsReadingAt(Instant at) {
+    Objects.requireNonNull(at, "at");
+    return lastReadingAt == null || at.isAfter(lastReadingAt);
+  }
+
+  /**
+   * Applies a telemetry reading: battery, lock state and time replace the old ones, and so does the
+   * position unless the reading has none (only its hub is known), in which case the last known
+   * position stays. The lifecycle state and the hub are not changed: they belong to the lifecycle
+   * (BR14, BR16), not to a reading.
+   *
+   * @throws IllegalArgumentException if the timestamp is not newer than the last reading (BR17)
+   */
+  public Vehicle withReading(
+      BatteryLevel level, LockState lock, GeoPosition newPosition, Instant at) {
+    Objects.requireNonNull(level, "level");
+    Objects.requireNonNull(lock, "lock");
+    if (!acceptsReadingAt(at)) {
+      throw new IllegalArgumentException(
+          "The reading of %s at %s is not newer than the last one".formatted(code, at));
+    }
+    return new Vehicle(
+        id,
+        code,
+        type,
+        state,
+        hubId,
+        level,
+        lock,
+        newPosition != null ? newPosition : position,
+        at);
   }
 
   /**
@@ -112,6 +186,15 @@ public record Vehicle(
    */
   private Vehicle transition(VehicleAction action, UUID hubAfter) {
     VehicleState next = state.after(action);
-    return new Vehicle(id, code, type, next, next.isAtHub() ? hubAfter : null, batteryLevel);
+    return new Vehicle(
+        id,
+        code,
+        type,
+        next,
+        next.isAtHub() ? hubAfter : null,
+        batteryLevel,
+        lockState,
+        position,
+        lastReadingAt);
   }
 }
