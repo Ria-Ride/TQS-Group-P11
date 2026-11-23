@@ -20,6 +20,7 @@ classDiagram
   class RulesOfUse {
     maxBookingDuration
     minBatteryPercent
+    batteryPercentPer30Minutes
     startWindow
     repositioningWindow
     overtimeGrace
@@ -208,7 +209,7 @@ classDiagram
 | Account | Accounts and Access | A person using the platform. A guest is an account created with name and email only, with no institutional identity. Roles define what the person may do. A field technician is an OPERATOR account with `fieldTechnician` set |
 | Role | Accounts and Access | END_USER, OPERATOR, CLIENT_MANAGER, ADMIN |
 | Client | Client Rules and KPIs | The institution that contracts the service (the hotel group). Owns the hubs, sets the rules and issues the stay codes of its partner accommodations |
-| RulesOfUse | Client Rules and KPIs | Configuration the client edits: maximum booking duration, minimum battery to book, start window of a reservation, repositioning window after a refused return, and the overtime parameters (grace period, block length, rate per block) |
+| RulesOfUse | Client Rules and KPIs | Configuration the client edits: maximum booking duration, minimum battery to book and the battery a ride uses per started 30 minutes (one rate for each vehicle type), start window of a reservation, repositioning window after a refused return, and the overtime parameters (grace period, block length, rate per block) |
 | DepositRate | Client Rules and KPIs | Deposit amount for one vehicle type |
 | ServiceLevel | Client Rules and KPIs | The contracted SLA: maximum repair time for maintenance tickets and the availability target used by the KPIs |
 | Hub | Fleet | A place where vehicles are picked up and returned: a code, a name, a location and a capacity. It holds at most `capacity` vehicles (BR14). Operators register hubs and change the capacity (US08); client managers can change it too (US14) |
@@ -259,7 +260,7 @@ stateDiagram-v2
   Retired --> [*]
 ```
 
-A vehicle is **bookable** only in Available, and then only if its battery is at or above the minimum. A vehicle in InTransit is being moved between hubs by the operator and belongs to no hub. A Retired vehicle leaves its hub too, so the vehicles a hub holds (BR14) are exactly those whose current hub it is: Deactivated, Available, Reserved and Maintenance.
+A vehicle is **bookable** only in Available (BR2), and then only if its battery is at or above the minimum (BR1). When the duration of the ride is known, the vehicle needs more: the minimum plus the rate of its type for every started 30 minutes of the ride (for example, with a minimum of 20% and 5% per 30 minutes, a ride of 31 minutes needs 30%). Without a duration only the minimum applies. A vehicle that has not reported its battery yet is not bookable. A vehicle in InTransit is being moved between hubs by the operator and belongs to no hub. A Retired vehicle leaves its hub too, so the vehicles a hub holds (BR14) are exactly those whose current hub it is: Deactivated, Available, Reserved and Maintenance.
 
 | From | To | Trigger | Condition |
 |------|----|---------|-----------|
