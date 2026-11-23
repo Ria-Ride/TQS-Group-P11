@@ -18,6 +18,7 @@ import pt.ua.deti.tqs.p11.TestcontainersConfiguration;
 import pt.ua.deti.tqs.p11.application.fleet.HubRepository;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
+import pt.ua.deti.tqs.p11.domain.fleet.BatteryLevel;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.GeoPosition;
 import pt.ua.deti.tqs.p11.domain.fleet.Hub;
@@ -177,5 +178,76 @@ class VehiclePersistenceAdapterIT {
                 BIKE_09_ID,
                 HUB_03_ID))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  // ------------------------------------------------------------- battery and hub search (US02)
+
+  @Test
+  void save_batteryLevel_isStoredAndReadBack() {
+    Vehicle charged = bike09().activate().withBattery(BatteryLevel.of(64));
+
+    vehicles.save(charged);
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT battery_percent FROM vehicles WHERE id = ?", Integer.class, BIKE_09_ID))
+        .isEqualTo(64);
+    assertThat(vehicles.findById(BIKE_09_ID)).contains(charged);
+  }
+
+  @Test
+  void save_noBatteryReading_isStoredAsNullAndReadBackEmpty() {
+    vehicles.save(bike09());
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT battery_percent FROM vehicles WHERE id = ?", Integer.class, BIKE_09_ID))
+        .isNull();
+    assertThat(vehicles.findById(BIKE_09_ID).orElseThrow().battery()).isEmpty();
+  }
+
+  @Test
+  void save_newReading_overwritesTheOldOne() {
+    vehicles.save(bike09().withBattery(BatteryLevel.of(64)));
+
+    vehicles.save(bike09().withBattery(BatteryLevel.of(19)));
+
+    assertThat(vehicles.findById(BIKE_09_ID).orElseThrow().battery()).contains(BatteryLevel.of(19));
+  }
+
+  /** The database refuses what BatteryLevel refuses, even for a write that bypasses the domain. */
+  @Test
+  void database_batteryOutsideZeroToHundred_isRefused() {
+    vehicles.save(bike09());
+
+    assertThatThrownBy(
+            () -> jdbc.update("UPDATE vehicles SET battery_percent = 101 WHERE id = ?", BIKE_09_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThatThrownBy(
+            () -> jdbc.update("UPDATE vehicles SET battery_percent = -1 WHERE id = ?", BIKE_09_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  void findAtHub_returnsOnlyThatHubsVehiclesOrderedByCode() {
+    vehicles.save(registered(BIKE_10_ID, "bike-0010", VehicleType.E_BIKE, HUB_03_ID));
+    vehicles.save(bike09());
+    vehicles.save(registered(SCOOTER_07_ID, "scooter-0007", VehicleType.E_SCOOTER, HUB_05_ID));
+
+    assertThat(vehicles.findAtHub(HUB_03_ID))
+        .extracting(vehicle -> vehicle.code().value())
+        .containsExactly("bike-0009", "bike-0010");
+  }
+
+  @Test
+  void findAtHub_leavesOutVehiclesThatAreNotAtAHub() {
+    vehicles.save(bike09().activate().startMove());
+
+    assertThat(vehicles.findAtHub(HUB_03_ID)).isEmpty();
+  }
+
+  @Test
+  void findAtHub_hubWithoutVehicles_isEmpty() {
+    assertThat(vehicles.findAtHub(HUB_05_ID)).isEmpty();
   }
 }

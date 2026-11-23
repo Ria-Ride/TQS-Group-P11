@@ -11,6 +11,7 @@ PATCH,/admin/users/{id}/role,N,N,N,N,Y
 PATCH,/admin/users/{id}/status,N,N,N,N,Y
 GET,/hubs,N,Y,Y,Y,Y
 GET,/hubs/{id},N,Y,Y,Y,Y
+GET,/hubs/{id}/vehicles,N,Y,Y,Y,Y
 POST,/hubs,N,N,Y,N,Y
 PATCH,/hubs/{id},N,N,Y,Y,Y
 GET,/vehicles,N,Y,Y,Y,Y
