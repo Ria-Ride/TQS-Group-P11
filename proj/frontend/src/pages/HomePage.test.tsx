@@ -123,4 +123,24 @@ describe("home page", () => {
     await screen.findByRole("heading", { name: "Hello, Ana Sousa" });
     expect(screen.queryByRole("link", { name: "Manage fleet" })).not.toBeInTheDocument();
   });
+
+  it.each(["END_USER", "OPERATOR", "CLIENT_MANAGER", "ADMIN"])(
+    "offers the vehicle search to a %s",
+    async (role) => {
+      saveSession(session);
+      vi.mocked(getProfile).mockResolvedValue({
+        id: session.userId,
+        name: "Ana Sousa",
+        email: "ana.sousa@example.com",
+        role,
+      });
+      renderApp("/");
+
+      await screen.findByRole("heading", { name: "Hello, Ana Sousa" });
+      expect(screen.getByRole("link", { name: "Find a vehicle" })).toHaveAttribute(
+        "href",
+        "/vehicles/search",
+      );
+    },
+  );
 });
