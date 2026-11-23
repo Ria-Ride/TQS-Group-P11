@@ -262,8 +262,8 @@ All containers join one private Compose network and reach each other by service 
 | `frontend` | nginx serving the React build | Web UI; forwards `/api` to the backend, so the browser talks to one origin only | 80, published | `backend` (HTTP) |
 | `backend` | Java 21, Spring Boot 4 | REST API and the core (modular monolith, section 4.3) | 8080, internal | `db` (JDBC), `broker` (MQTT), `payment-gateway` (HTTP) |
 | `db` | PostgreSQL | Persistence of every module | 5432, internal | none |
-| `broker` | MQTT broker **[TBD]** | Carries telemetry from the simulator to the backend | 1883, internal | none |
-| `simulator` | Fleet telemetry simulator **[stack TBD]** | Publishes vehicle readings (battery, position, lock state, faults) | none | `broker` (MQTT) |
+| `broker` | Eclipse Mosquitto 2.0.22 (MQTT) | Carries telemetry from the simulator to the backend | 1883, internal | none |
+| `simulator` | Fleet telemetry simulator (Java 21, Spring Boot; image `ghcr.io/o-reis/tqs-telemetry-simulator`, release pinned in Compose) | Publishes vehicle readings (battery, position, lock state, faults) | none | `broker` (MQTT) |
 | `payment-gateway` | Simulated payment gateway **[stack TBD]** | Charges, authorizes, captures and releases deposits | internal **[TBD]** | none |
 
 The database keeps its data in the named volume `db-data`, so data survives a restart or a rebuild of the containers. Credentials come from a git-ignored `.env` file on each machine; the repository holds only `.env.example` with placeholder values.
