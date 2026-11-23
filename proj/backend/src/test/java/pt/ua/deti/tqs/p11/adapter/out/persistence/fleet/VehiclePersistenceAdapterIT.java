@@ -3,6 +3,7 @@ package pt.ua.deti.tqs.p11.adapter.out.persistence.fleet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,7 @@ import pt.ua.deti.tqs.p11.domain.fleet.BatteryLevel;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.GeoPosition;
 import pt.ua.deti.tqs.p11.domain.fleet.Hub;
+import pt.ua.deti.tqs.p11.domain.fleet.LockState;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
 
@@ -249,5 +251,93 @@ class VehiclePersistenceAdapterIT {
   @Test
   void findAtHub_hubWithoutVehicles_isEmpty() {
     assertThat(vehicles.findAtHub(HUB_05_ID)).isEmpty();
+  }
+
+  // ------------------------------------------------------------- telemetry reading (US09)
+
+  private static final Instant T0 = Instant.parse("2026-11-10T10:00:00Z");
+
+  @Test
+  void save_lastReading_isStoredAndReadBack() {
+    Vehicle reported =
+        bike09()
+            .activate()
+            .withReading(
+                BatteryLevel.of(78), LockState.UNLOCKED, new GeoPosition(40.6405, -8.6538), T0);
+
+    vehicles.save(reported);
+
+    Map<String, Object> row =
+        jdbc.queryForMap(
+            "SELECT battery_percent, lock_state, latitude, longitude, last_reading_at "
+                + "FROM vehicles WHERE id = ?",
+            BIKE_09_ID);
+    assertThat(row)
+        .containsEntry("battery_percent", 78)
+        .containsEntry("lock_state", "UNLOCKED")
+        .containsEntry("latitude", 40.6405)
+        .containsEntry("longitude", -8.6538);
+    assertThat(((java.sql.Timestamp) row.get("last_reading_at")).toInstant()).isEqualTo(T0);
+    assertThat(vehicles.findById(BIKE_09_ID)).contains(reported);
+  }
+
+  @Test
+  void save_vehicleWithoutAReading_isStoredWithNullsAndReadBackEmpty() {
+    vehicles.save(bike09());
+
+    Vehicle read = vehicles.findById(BIKE_09_ID).orElseThrow();
+
+    assertThat(read.lock()).isEmpty();
+    assertThat(read.lastPosition()).isEmpty();
+    assertThat(read.lastReading()).isEmpty();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT lock_state FROM vehicles WHERE id = ?", String.class, BIKE_09_ID))
+        .isNull();
+  }
+
+  @Test
+  void findByCodeForUpdate_insideATransaction_returnsTheVehicleWithThatCode() {
+    vehicles.save(bike09());
+
+    Optional<Vehicle> locked =
+        transaction.execute(status -> vehicles.findByCodeForUpdate(FleetCode.of("bike-0009")));
+
+    assertThat(locked).contains(bike09());
+  }
+
+  @Test
+  void findByCodeForUpdate_unknownCode_isEmpty() {
+    Optional<Vehicle> locked =
+        transaction.execute(status -> vehicles.findByCodeForUpdate(FleetCode.of("bike-0404")));
+
+    assertThat(locked).isEmpty();
+  }
+
+  @Test
+  void database_readingThatTheDomainWouldRefuse_isRefused() {
+    vehicles.save(bike09());
+
+    assertThatThrownBy(
+            () -> jdbc.update("UPDATE vehicles SET lock_state = 'BROKEN' WHERE id = ?", BIKE_09_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "UPDATE vehicles SET latitude = 91, longitude = 0 WHERE id = ?", BIKE_09_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "UPDATE vehicles SET latitude = 40, longitude = 181 WHERE id = ?", BIKE_09_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  /** A position is both coordinates or none. */
+  @Test
+  void database_positionWithOnlyOneCoordinate_isRefused() {
+    vehicles.save(bike09());
+
+    assertThatThrownBy(
+            () -> jdbc.update("UPDATE vehicles SET latitude = 40 WHERE id = ?", BIKE_09_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 }
