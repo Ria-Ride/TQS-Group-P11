@@ -47,6 +47,14 @@ class SecurityConfiguration {
                 .permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health")
                 .permitAll()
+                // API documentation (OpenAPI description and Swagger UI): read only, no data.
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/v3/api-docs",
+                    "/v3/api-docs/**",
+                    "/swagger-ui.html",
+                    "/swagger-ui/**")
+                .permitAll()
                 // Errors such as malformed JSON are forwarded to /error; keep their status.
                 .requestMatchers("/error")
                 .permitAll()

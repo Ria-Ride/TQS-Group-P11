@@ -6,6 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +88,47 @@ class StayPersistenceAdapterIT {
   @Test
   void findByCodeForUpdate_unknownCode_isEmpty() {
     assertThat(findLocked("IT-9999")).isEmpty();
+  }
+
+  /**
+   * BR9, K3: while one transaction holds the stay, a second one asking for it waits, and gets it
+   * only after the first commits. This is what makes two purchases with one code run one after the
+   * other, so only one account can link it. Without the lock the second would not wait.
+   */
+  @Test
+  void findByCodeForUpdate_whileAnotherTransactionHoldsTheStay_waitsUntilItCommits()
+      throws Exception {
+    CountDownLatch firstHoldsTheLock = new CountDownLatch(1);
+    CountDownLatch firstMayCommit = new CountDownLatch(1);
+
+    try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+      Future<?> first =
+          pool.submit(() ->
+              transaction.executeWithoutResult(status -> {
+                stays.findByCodeForUpdate("IT-1001").orElseThrow();
+                firstHoldsTheLock.countDown();
+                await(firstMayCommit);
+              }));
+      assertThat(firstHoldsTheLock.await(10, TimeUnit.SECONDS)).isTrue();
+
+      Future<Optional<Stay>> second = pool.submit(() -> findLocked("IT-1001"));
+
+      assertThatThrownBy(() -> second.get(500, TimeUnit.MILLISECONDS))
+          .as("the second transaction waits for the lock")
+          .isInstanceOf(TimeoutException.class);
+      firstMayCommit.countDown();
+      first.get(10, TimeUnit.SECONDS);
+      assertThat(second.get(10, TimeUnit.SECONDS)).isPresent();
+    }
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(e);
+    }
   }
 
   @Test

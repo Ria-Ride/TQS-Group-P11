@@ -1,0 +1,59 @@
+package pt.ua.deti.tqs.p11.adapter.out.persistence.billing;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+import pt.ua.deti.tqs.p11.domain.billing.Payment;
+import pt.ua.deti.tqs.p11.domain.billing.PaymentState;
+
+/** JPA mapping of payments. Payments are only inserted. */
+@Entity
+@Table(name = "payments")
+class PaymentJpaEntity {
+
+  @Id private UUID id;
+
+  @Column(name = "account_id", nullable = false)
+  private UUID accountId;
+
+  @Column(name = "pass_id")
+  private UUID passId;
+
+  @Column(nullable = false, precision = 10, scale = 2)
+  private BigDecimal amount;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private PaymentState state;
+
+  @Column(name = "gateway_reference", length = 100)
+  private String gatewayReference;
+
+  @Column(name = "failure_reason", length = 50)
+  private String failureReason;
+
+  @Column(name = "created_at", nullable = false)
+  private Instant createdAt;
+
+  /** For JPA only. */
+  protected PaymentJpaEntity() {}
+
+  static PaymentJpaEntity from(Payment payment) {
+    PaymentJpaEntity entity = new PaymentJpaEntity();
+    entity.id = payment.id();
+    entity.accountId = payment.accountId();
+    entity.passId = payment.passId().orElse(null);
+    entity.amount = payment.amount().amount();
+    entity.state = payment.state();
+    entity.gatewayReference = payment.gatewayReference().orElse(null);
+    entity.failureReason = payment.failureReason().orElse(null);
+    entity.createdAt = payment.at();
+    return entity;
+  }
+}

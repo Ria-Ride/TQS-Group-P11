@@ -57,8 +57,9 @@ public class PassPurchaseSteps {
   /** Runs before the hooks that delete users, because passes and stays point to them. */
   @Before(order = 9000)
   public void startWithNoPassesAndNoStays() {
-    jdbc.update("DELETE FROM passes");
+    // Children first: payments point to passes, passes to stays.
     jdbc.update("DELETE FROM payments");
+    jdbc.update("DELETE FROM passes");
     jdbc.update("DELETE FROM stays");
     http = ApiClient.forPort(port);
   }

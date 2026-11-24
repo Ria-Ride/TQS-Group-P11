@@ -3,6 +3,7 @@ method,path,ANONYMOUS,END_USER,OPERATOR,CLIENT_MANAGER,ADMIN
 POST,/auth/guest,Y,Y,Y,Y,Y
 POST,/auth/login,Y,Y,Y,Y,Y
 GET,/actuator/health,Y,Y,Y,Y,Y
+GET,/v3/api-docs,Y,Y,Y,Y,Y
 GET,/users/me,N,Y,Y,Y,Y
 GET,/users/{id},N,OWN,OWN,OWN,Y
 GET,/admin/users,N,N,N,N,Y
