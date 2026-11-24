@@ -34,6 +34,9 @@ public interface VehicleRepository {
    */
   int countAtHub(UUID hubId);
 
+  /** The vehicles physically at the hub, ordered by code. */
+  List<Vehicle> findAtHub(UUID hubId);
+
   /** Every vehicle, ordered by code. */
   List<Vehicle> findAll();
 }

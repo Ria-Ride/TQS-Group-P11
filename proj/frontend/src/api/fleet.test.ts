@@ -5,6 +5,7 @@ import {
   listVehicles,
   registerHub,
   registerVehicle,
+  searchHubVehicles,
   transition,
   vehicleHistory,
 } from "./fleet";
@@ -137,5 +138,30 @@ describe("fleet API", () => {
       body: undefined,
       authorization: "Bearer op-token",
     });
+  });
+
+  // ------------------------------------------------------------- US02: search a hub
+
+  it("searches the vehicles of a hub with no filter", async () => {
+    await searchHubVehicles(HUB_ID, { type: null, minutes: null }, "tourist-token");
+
+    expect(sentRequest()).toEqual({
+      url: `/api/hubs/${HUB_ID}/vehicles`,
+      method: "GET",
+      body: undefined,
+      authorization: "Bearer tourist-token",
+    });
+  });
+
+  it("sends the type and the length of the ride as query parameters", async () => {
+    await searchHubVehicles(HUB_ID, { type: "E_SCOOTER", minutes: 60 }, "tourist-token");
+
+    expect(sentRequest().url).toBe(`/api/hubs/${HUB_ID}/vehicles?type=E_SCOOTER&minutes=60`);
+  });
+
+  it("leaves out the filter that is not set", async () => {
+    await searchHubVehicles(HUB_ID, { type: null, minutes: 30 }, "tourist-token");
+
+    expect(sentRequest().url).toBe(`/api/hubs/${HUB_ID}/vehicles?minutes=30`);
   });
 });

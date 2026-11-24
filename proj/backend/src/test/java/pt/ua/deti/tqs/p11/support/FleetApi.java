@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
@@ -78,6 +79,16 @@ public final class FleetApi {
         .headers(headers -> headers.setBearerAuth(token))
         .retrieve()
         .toEntity(ApiClient.JSON_OBJECT);
+  }
+
+  /** Only the status, for calls that may be refused with a body that is not a list. */
+  public HttpStatusCode status(String uri) {
+    return http.get()
+        .uri(uri)
+        .headers(headers -> headers.setBearerAuth(token))
+        .retrieve()
+        .toBodilessEntity()
+        .getStatusCode();
   }
 
   public ResponseEntity<List<Map<String, Object>>> getList(String uri) {

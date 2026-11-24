@@ -1,4 +1,4 @@
-import type { Hub, VehicleAction, VehicleState, VehicleType } from "../api/fleet";
+import type { Hub, HubVehicle, VehicleAction, VehicleState, VehicleType } from "../api/fleet";
 
 export const STATE_LABELS: Record<VehicleState, string> = {
   DEACTIVATED: "Deactivated",
@@ -59,3 +59,34 @@ export const HUB_FULL = "This hub is full.";
 export const CAPACITY_MESSAGE = "Enter a capacity of at least 1.";
 export const CAPACITY_BELOW_HELD = "The hub holds more vehicles than that.";
 export const TRANSITION_REFUSED = "This change is not allowed in the vehicle's current state.";
+
+/** The lengths of ride a tourist can pick; the API takes any number of minutes from 1 to 1440. */
+export const RIDE_LENGTHS: { minutes: number; label: string }[] = [
+  { minutes: 30, label: "Up to 30 minutes" },
+  { minutes: 60, label: "Up to 1 hour" },
+  { minutes: 120, label: "Up to 2 hours" },
+  { minutes: 180, label: "Up to 3 hours" },
+  { minutes: 240, label: "Up to 4 hours" },
+  { minutes: 480, label: "Up to 8 hours" },
+];
+
+/** Above this, no battery can do the ride (the API does not cap the percentage at 100). */
+const FULL_BATTERY = 100;
+
+/** What a tourist reads next to a vehicle that cannot be booked (BR1, BR2). */
+export function unbookableText(vehicle: HubVehicle): string {
+  switch (vehicle.unbookableReason) {
+    case "NOT_AVAILABLE":
+      return `Not available (${STATE_LABELS[vehicle.state]})`;
+    case "NO_BATTERY_READING":
+      return "Battery level unknown";
+    case "LOW_BATTERY":
+      return `Battery too low (needs at least ${vehicle.requiredBatteryPercent}%)`;
+    case "INSUFFICIENT_FOR_DURATION":
+      return vehicle.requiredBatteryPercent > FULL_BATTERY
+        ? "This ride is too long for one battery charge"
+        : `Not enough battery for this ride (needs ${vehicle.requiredBatteryPercent}%)`;
+    case null:
+      return "Bookable";
+  }
+}

@@ -61,6 +61,7 @@ class SecurityConfiguration {
                     HttpMethod.GET,
                     "/hubs",
                     "/hubs/{id}",
+                    "/hubs/{id}/vehicles",
                     "/vehicles",
                     "/vehicles/{id}",
                     "/vehicle-types",
