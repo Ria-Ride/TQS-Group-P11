@@ -94,7 +94,7 @@ a reading is only applied to a vehicle the platform knows.
 | `APP_TELEMETRY_USERNAME`, `APP_TELEMETRY_PASSWORD` | empty | Broker credentials; empty connects without |
 | `APP_TELEMETRY_CLIENT_ID` | generated | MQTT client id; unique per broker |
 | `APP_TELEMETRY_FLEET_ID` | `fleet-01` | The only fleet the platform listens to |
-| `APP_DEMO_SEED_FLEET` | `false` (Compose: `true`) | Register the simulator's hubs and vehicles at start-up |
+| `APP_DEMO_SEED_FLEET` | `false` (Compose: `true`) | Register the simulator's hubs and vehicles at start-up. Set both this and `APP_TELEMETRY_ENABLED` to `false` in `.env` for a run that must start with an empty fleet |
 | `SIMULATOR_VERSION`, `SIMULATOR_SCENARIO_FILE` | `1.0.0`, `ria-ride.yml` | Which simulator release and scenario Compose runs |
 
 To work on the fleet telemetry simulator, clone its repository into `proj/simulator` (that folder

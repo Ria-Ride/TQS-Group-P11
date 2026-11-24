@@ -47,10 +47,11 @@ services:
   backend:
     build: ./proj/backend
     environment:
-      # Telemetry from the simulator (US09), and the demo hubs and vehicles it reports about.
-      APP_TELEMETRY_ENABLED: "true"
+      # Telemetry from the simulator (US09), and the demo hubs and vehicles it reports about. On by
+      # default; set either to false in .env for a run that must start with an empty fleet (E2E).
+      APP_TELEMETRY_ENABLED: ${APP_TELEMETRY_ENABLED:-true}
       APP_TELEMETRY_HOST: broker
-      APP_DEMO_SEED_FLEET: "true"
+      APP_DEMO_SEED_FLEET: ${APP_DEMO_SEED_FLEET:-true}
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
