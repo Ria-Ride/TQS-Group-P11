@@ -23,7 +23,7 @@ node "Department VM (provided by the teaching staff)\nLinux, Docker Engine, Dock
   storage "db-data\n<<named volume>>" as dbdata
   node "broker\n<<container>>\nMQTT broker [TBD]" as broker
   node "simulator\n<<container>>\nfleet telemetry simulator\n[stack TBD]" as simulator
-  node "payment-gateway\n<<container>>\nsimulated payment gateway\n[stack TBD]" as payment
+  node "payment-gateway\n<<container>>\nsimulated payment gateway\nSpring Boot 4" as payment
 }
 
 user --> frontend : HTTP :80\n(only published port)
