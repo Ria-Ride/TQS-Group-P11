@@ -62,7 +62,7 @@ Requires Docker with Docker Compose. Nothing else (no local Java, Maven or Node)
 ```bash
 cp .env.example .env          # then edit .env: set your own database password and APP_JWT_SECRET
 openssl rand -base64 48       # generates a value for APP_JWT_SECRET (at least 32 bytes)
-docker compose up --build     # backend, frontend and PostgreSQL
+docker compose up --build     # backend, frontend, PostgreSQL, MQTT broker and simulator
 ```
 
 Never commit `.env`. Compose refuses to start when `APP_JWT_SECRET` is not set.
@@ -76,6 +76,26 @@ Open http://localhost (or the `FRONTEND_PORT` set in `.env`). Without a session 
 from there you can create a guest account. Nginx serves the app and forwards `/api/*` to the backend,
 so the browser talks to one origin only (no CORS). `docker compose down` stops the stack and keeps the
 data; `docker compose down -v` also deletes the database volume.
+
+### Telemetry
+
+The stack also runs an MQTT broker (Eclipse Mosquitto) and the fleet telemetry simulator (a pinned
+release of its public image). The simulator publishes a reading for each of its 20 vehicles every
+10 seconds, as in its contract 1.0.0, and the backend applies them: battery, position and lock
+state of each vehicle, shown by `GET /vehicles`. A reading is discarded and logged (BR17) when the
+battery is outside 0 to 100, the vehicle is unknown, or its timestamp is not newer than the last
+one. At start-up the backend registers the simulator's hubs and vehicles (the demo fleet), because
+a reading is only applied to a vehicle the platform knows.
+
+| Setting (environment variable) | Default | Meaning |
+| --- | --- | --- |
+| `APP_TELEMETRY_ENABLED` | `false` (Compose: `true`) | Receive telemetry from the broker |
+| `APP_TELEMETRY_HOST`, `APP_TELEMETRY_PORT` | `localhost`, `1883` (Compose: `broker`) | The MQTT broker |
+| `APP_TELEMETRY_USERNAME`, `APP_TELEMETRY_PASSWORD` | empty | Broker credentials; empty connects without |
+| `APP_TELEMETRY_CLIENT_ID` | generated | MQTT client id; unique per broker |
+| `APP_TELEMETRY_FLEET_ID` | `fleet-01` | The only fleet the platform listens to |
+| `APP_DEMO_SEED_FLEET` | `false` (Compose: `true`) | Register the simulator's hubs and vehicles at start-up. Set both this and `APP_TELEMETRY_ENABLED` to `false` in `.env` for a run that must start with an empty fleet |
+| `SIMULATOR_VERSION`, `SIMULATOR_SCENARIO_FILE` | `1.0.0`, `ria-ride.yml` | Which simulator release and scenario Compose runs |
 
 To work on the fleet telemetry simulator, clone its repository into `proj/simulator` (that folder
 is git-ignored here, so the two repositories stay separate):

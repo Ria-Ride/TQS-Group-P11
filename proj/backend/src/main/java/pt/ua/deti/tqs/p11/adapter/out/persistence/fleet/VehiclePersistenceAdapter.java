@@ -48,6 +48,11 @@ class VehiclePersistenceAdapter implements VehicleRepository {
   }
 
   @Override
+  public Optional<Vehicle> findByCodeForUpdate(FleetCode code) {
+    return repository.findWithLockByCode(code.value()).map(VehicleJpaEntity::toDomain);
+  }
+
+  @Override
   public boolean existsByCode(FleetCode code) {
     return repository.existsByCode(code.value());
   }

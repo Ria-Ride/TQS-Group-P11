@@ -1,0 +1,148 @@
+{
+  "hubs": [
+    {
+      "code": "hub-01",
+      "name": "Estação de Aveiro",
+      "latitude": 40.6443,
+      "longitude": -8.6455,
+      "capacity": 20
+    },
+    {
+      "code": "hub-02",
+      "name": "Fórum Aveiro",
+      "latitude": 40.6412,
+      "longitude": -8.6501,
+      "capacity": 20
+    },
+    {
+      "code": "hub-03",
+      "name": "Canal Central",
+      "latitude": 40.6405,
+      "longitude": -8.6538,
+      "capacity": 20
+    },
+    {
+      "code": "hub-04",
+      "name": "Universidade",
+      "latitude": 40.6304,
+      "longitude": -8.6577,
+      "capacity": 20
+    },
+    {
+      "code": "hub-05",
+      "name": "Hotel Ria Azul",
+      "latitude": 40.6421,
+      "longitude": -8.6524,
+      "capacity": 20
+    },
+    {
+      "code": "hub-06",
+      "name": "Hotel Laguna",
+      "latitude": 40.6385,
+      "longitude": -8.6489,
+      "capacity": 20
+    }
+  ],
+  "vehicles": [
+    {
+      "code": "bike-0001",
+      "type": "E_BIKE",
+      "hub": "hub-05"
+    },
+    {
+      "code": "bike-0002",
+      "type": "E_BIKE",
+      "hub": "hub-05"
+    },
+    {
+      "code": "scooter-0001",
+      "type": "E_SCOOTER",
+      "hub": "hub-05"
+    },
+    {
+      "code": "bike-0003",
+      "type": "E_BIKE",
+      "hub": "hub-05"
+    },
+    {
+      "code": "bike-0004",
+      "type": "E_BIKE",
+      "hub": "hub-06"
+    },
+    {
+      "code": "bike-0005",
+      "type": "E_BIKE",
+      "hub": "hub-06"
+    },
+    {
+      "code": "scooter-0002",
+      "type": "E_SCOOTER",
+      "hub": "hub-06"
+    },
+    {
+      "code": "scooter-0003",
+      "type": "E_SCOOTER",
+      "hub": "hub-06"
+    },
+    {
+      "code": "bike-0006",
+      "type": "E_BIKE",
+      "hub": "hub-01"
+    },
+    {
+      "code": "scooter-0004",
+      "type": "E_SCOOTER",
+      "hub": "hub-01"
+    },
+    {
+      "code": "bike-0007",
+      "type": "E_BIKE",
+      "hub": "hub-01"
+    },
+    {
+      "code": "bike-0008",
+      "type": "E_BIKE",
+      "hub": "hub-02"
+    },
+    {
+      "code": "scooter-0005",
+      "type": "E_SCOOTER",
+      "hub": "hub-02"
+    },
+    {
+      "code": "scooter-0006",
+      "type": "E_SCOOTER",
+      "hub": "hub-02"
+    },
+    {
+      "code": "bike-0009",
+      "type": "E_BIKE",
+      "hub": "hub-03"
+    },
+    {
+      "code": "bike-0010",
+      "type": "E_BIKE",
+      "hub": "hub-03"
+    },
+    {
+      "code": "scooter-0007",
+      "type": "E_SCOOTER",
+      "hub": "hub-03"
+    },
+    {
+      "code": "bike-0011",
+      "type": "E_BIKE",
+      "hub": "hub-04"
+    },
+    {
+      "code": "bike-0012",
+      "type": "E_BIKE",
+      "hub": "hub-04"
+    },
+    {
+      "code": "scooter-0008",
+      "type": "E_SCOOTER",
+      "hub": "hub-04"
+    }
+  ]
+}

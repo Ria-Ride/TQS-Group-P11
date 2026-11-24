@@ -6,9 +6,12 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import pt.ua.deti.tqs.p11.domain.fleet.BatteryLevel;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
+import pt.ua.deti.tqs.p11.domain.fleet.GeoPosition;
+import pt.ua.deti.tqs.p11.domain.fleet.LockState;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleState;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
@@ -37,9 +40,20 @@ class VehicleJpaEntity {
   @Column(name = "hub_id")
   private UUID hubId;
 
-  /** NULL until the first telemetry report. */
+  /** The last telemetry reading; NULL until the first report (US02, US09). */
   @Column(name = "battery_percent")
   private Integer batteryPercent;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "lock_state", length = 10)
+  private LockState lockState;
+
+  private Double latitude;
+
+  private Double longitude;
+
+  @Column(name = "last_reading_at")
+  private Instant lastReadingAt;
 
   /** For JPA only. */
   protected VehicleJpaEntity() {}
@@ -52,11 +66,18 @@ class VehicleJpaEntity {
     entity.state = vehicle.state();
     entity.hubId = vehicle.hubId();
     entity.batteryPercent = vehicle.battery().map(BatteryLevel::percent).orElse(null);
+    entity.lockState = vehicle.lock().orElse(null);
+    entity.latitude = vehicle.lastPosition().map(GeoPosition::latitude).orElse(null);
+    entity.longitude = vehicle.lastPosition().map(GeoPosition::longitude).orElse(null);
+    entity.lastReadingAt = vehicle.lastReading().orElse(null);
     return entity;
   }
 
   Vehicle toDomain() {
     BatteryLevel battery = batteryPercent == null ? null : BatteryLevel.of(batteryPercent);
-    return new Vehicle(id, FleetCode.of(code), type, state, hubId, battery);
+    GeoPosition position =
+        latitude == null || longitude == null ? null : new GeoPosition(latitude, longitude);
+    return new Vehicle(
+        id, FleetCode.of(code), type, state, hubId, battery, lockState, position, lastReadingAt);
   }
 }

@@ -18,4 +18,7 @@ interface SpringDataVehicleRepository extends JpaRepository<VehicleJpaEntity, UU
   /** SELECT ... FOR UPDATE: the row stays locked until the transaction ends. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<VehicleJpaEntity> findWithLockById(UUID id);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  Optional<VehicleJpaEntity> findWithLockByCode(String code);
 }

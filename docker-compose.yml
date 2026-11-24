@@ -19,9 +19,39 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # MQTT broker between the simulator and the backend (US09). Same version as the simulator's own
+  # tests. The image ships this no-authentication configuration; the broker is internal to the
+  # Compose network (no published port), so it is not reachable from outside.
+  broker:
+    image: eclipse-mosquitto:2.0.22
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -i healthcheck -W 3"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # Fleet telemetry simulator (separate repository, public image, pinned release). It publishes the
+  # readings of the 20 vehicles of its default scenario (fleet-01) on the broker, as in contract 1.0.0.
+  simulator:
+    image: ghcr.io/o-reis/tqs-telemetry-simulator:${SIMULATOR_VERSION:-1.0.0}
+    environment:
+      SIMULATOR_MQTT_HOST: broker
+      SIMULATOR_SCENARIO_FILE: ${SIMULATOR_SCENARIO_FILE:-classpath:scenarios/ria-ride.yml}
+    depends_on:
+      broker:
+        condition: service_healthy
+    restart: unless-stopped
+
   backend:
     build: ./proj/backend
     environment:
+      # Telemetry from the simulator (US09), and the demo hubs and vehicles it reports about. On by
+      # default; set either to false in .env for a run that must start with an empty fleet (E2E).
+      APP_TELEMETRY_ENABLED: ${APP_TELEMETRY_ENABLED:-true}
+      APP_TELEMETRY_HOST: broker
+      APP_DEMO_SEED_FLEET: ${APP_DEMO_SEED_FLEET:-true}
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -31,6 +61,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     depends_on:
       db:
+        condition: service_healthy
+      broker:
         condition: service_healthy
     healthcheck:
       # 503 (status DOWN, e.g. database unreachable) makes wget fail, so the check fails

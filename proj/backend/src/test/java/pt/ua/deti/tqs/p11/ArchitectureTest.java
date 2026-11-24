@@ -42,4 +42,18 @@ class ArchitectureTest {
           .should()
           .beFreeOfCycles()
           .allowEmptyShould(true);
+
+  /**
+   * K1: the simulator can be replaced by changing only its adapter. The core (domain and
+   * application) knows no MQTT client and no JSON library, whatever simulator or format comes next.
+   */
+  @ArchTest
+  static final ArchRule core_knows_no_mqtt_client_and_no_json_library =
+      noClasses()
+          .that()
+          .resideInAnyPackage("..p11.domain..", "..p11.application..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("com.hivemq..", "tools.jackson..", "com.fasterxml.jackson..")
+          .allowEmptyShould(true);
 }

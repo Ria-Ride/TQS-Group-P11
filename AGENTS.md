@@ -61,7 +61,7 @@ Status legend: items marked **[TBD]** are not decided yet. Do not invent a value
 | Build                 | Maven, wrapper `./mvnw` (`mvnw.cmd` on Windows)                                     |
 | Frontend              | React + Vite + TypeScript; E2E with Playwright                                      |
 | DB                    | PostgreSQL (Testcontainers for integration tests)                                   |
-| Messaging / telemetry | MQTT, following the simulator contract v1.0.0 (`contract/` in the simulator repository); simulator behind **one port + adapter**; broker product **[TBD]** |
+| Messaging / telemetry | MQTT, following the simulator contract v1.0.0 (`contract/` in the simulator repository); simulator behind **one port + adapter**; broker Eclipse Mosquitto 2.0.22 |
 | Telemetry simulator   | Separate repository [o-reis/tqs-telemetry-simulator](https://github.com/o-reis/tqs-telemetry-simulator): Java 21, Spring Boot, Maven, HiveMQ MQTT Client (Mosquitto in integration tests); own CI at the same level as the backend; image published to GHCR from `main` |
 | Payments              | Sandbox (e.g. Stripe test mode) or simulated gateway, behind a port + adapter       |
 | Tests                 | JUnit 5, Mockito, AssertJ, Cucumber (BDD), Testcontainers, k6 (load)                |

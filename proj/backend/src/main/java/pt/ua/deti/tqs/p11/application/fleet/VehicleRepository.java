@@ -26,6 +26,9 @@ public interface VehicleRepository {
    */
   Optional<Vehicle> findByIdForUpdate(UUID id);
 
+  /** Like findByIdForUpdate, for the vehicle with this code (telemetry names vehicles by code). */
+  Optional<Vehicle> findByCodeForUpdate(FleetCode code);
+
   boolean existsByCode(FleetCode code);
 
   /**

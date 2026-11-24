@@ -1,4 +1,4 @@
-@KAN-54
+@REQ_KAN-54
 Feature: Search available vehicles by hub and vehicle type (US02)
   As a tourist
   I want to search available vehicles by hub and vehicle type
@@ -41,7 +41,7 @@ Feature: Search available vehicles by hub and vehicle type (US02)
       | E_BIKE    |
       | E_SCOOTER |
 
-  # BR1
+  @BR1
   Scenario Outline: A vehicle below the minimum battery is shown as not bookable
     Given hub "hub-03" holds these available vehicles:
       | code      | type   | battery   |
@@ -55,6 +55,7 @@ Feature: Search available vehicles by hub and vehicle type (US02)
       | 20      | bookable     |
 
   # BR1 with the duration of the ride: 20% floor + 5% per started 30 minutes
+  @BR1
   Scenario Outline: A longer ride needs more battery
     Given hub "hub-03" holds these available vehicles:
       | code      | type   | battery   |
@@ -71,6 +72,7 @@ Feature: Search available vehicles by hub and vehicle type (US02)
       | 31      | 30     | 30      | bookable     |
       | 120     | 40     | 40      | bookable     |
 
+  @BR1
   Scenario: Without a duration only the floor is needed
     Given hub "hub-03" holds these available vehicles:
       | code      | type   | battery |
@@ -79,6 +81,7 @@ Feature: Search available vehicles by hub and vehicle type (US02)
     Then vehicle "bike-0001" needs a battery of 20%
     And vehicle "bike-0001" is shown as bookable
 
+  @BR1
   Scenario: A ride no battery can do leaves nothing bookable
     Given hub "hub-03" holds these available vehicles:
       | code      | type   | battery |
@@ -96,6 +99,7 @@ Feature: Search available vehicles by hub and vehicle type (US02)
       | 1441    |
 
   # BR1, after a telemetry update
+  @BR1
   Scenario: A telemetry update changes the result of the next search
     Given hub "hub-03" holds these available vehicles:
       | code      | type   | battery |
@@ -105,12 +109,13 @@ Feature: Search available vehicles by hub and vehicle type (US02)
     And the tourist searches hub "hub-03"
     Then vehicle "bike-0001" is shown as not bookable
 
+  @BR1
   Scenario: A vehicle that has not reported its battery is not bookable
     Given hub "hub-03" holds an available vehicle "bike-0001" that has not reported its battery
     When the tourist searches hub "hub-03"
     Then vehicle "bike-0001" is shown as not bookable
 
-  # BR2
+  @BR2
   Scenario Outline: A vehicle that is not Available cannot be selected
     Given hub "hub-03" holds vehicle "bike-0001" in state "<state>" with a battery of 100%
     When the tourist searches hub "hub-03"
@@ -126,6 +131,7 @@ Feature: Search available vehicles by hub and vehicle type (US02)
     When the tourist searches hub "hub-03"
     Then the tourist sees no vehicles
 
+  @BR2
   Scenario: A hub whose vehicles are all unavailable has nothing to select
     Given hub "hub-03" holds vehicle "bike-0001" in state "Reserved" with a battery of 100%
     When the tourist searches hub "hub-03"
