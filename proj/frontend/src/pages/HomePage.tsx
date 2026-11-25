@@ -54,6 +54,11 @@ export function HomePage() {
             <h1>Hello, {profile.name}</h1>
             <p className="muted">You are logged in as {profile.email}.</p>
             <div className="home-actions">
+              {profile.role === "END_USER" && (
+                <Link className="button" to="/passes/buy">
+                  Buy a pass
+                </Link>
+              )}
               <Link className="button" to="/vehicles/search">
                 Find a vehicle
               </Link>

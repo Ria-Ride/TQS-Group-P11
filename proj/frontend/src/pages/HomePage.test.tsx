@@ -38,6 +38,28 @@ describe("home page", () => {
     expect(getProfile).toHaveBeenCalledWith(session.userId, "token-for-ana");
   });
 
+  it.each([
+    ["END_USER", true],
+    ["OPERATOR", false],
+  ])("offers buying a pass to a tourist only (%s)", async (role, offered) => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Ana Sousa",
+      email: "ana.sousa@example.com",
+      role,
+    });
+    renderApp("/");
+
+    await screen.findByRole("heading", { name: "Hello, Ana Sousa" });
+    const link = screen.queryByRole("link", { name: "Buy a pass" });
+    if (offered) {
+      expect(link).toHaveAttribute("href", "/passes/buy");
+    } else {
+      expect(link).not.toBeInTheDocument();
+    }
+  });
+
   it("forgets an expired session and asks to log in again", async () => {
     saveSession(session);
     vi.mocked(getProfile).mockRejectedValue(new ApiError(401, {}));

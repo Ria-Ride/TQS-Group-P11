@@ -44,9 +44,25 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Simulated payment gateway (US03, KAN-96). The token of each charge is a test card that decides
+  # the answer (tok_approve, tok_decline, tok_timeout). No real money, no card data. Internal only.
+  payment-gateway:
+    build: ./proj/payment-gateway
+    environment:
+      # How long tok_timeout waits; longer than the backend's read timeout (5 s).
+      GATEWAY_TIMEOUT_DELAY: ${GATEWAY_TIMEOUT_DELAY:-PT30S}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
   backend:
     build: ./proj/backend
     environment:
+      APP_PAYMENT_BASE_URL: http://payment-gateway:8080
       # Telemetry from the simulator (US09), and the demo hubs and vehicles it reports about. On by
       # default; set either to false in .env for a run that must start with an empty fleet (E2E).
       APP_TELEMETRY_ENABLED: ${APP_TELEMETRY_ENABLED:-true}
@@ -63,6 +79,8 @@ services:
       db:
         condition: service_healthy
       broker:
+        condition: service_healthy
+      payment-gateway:
         condition: service_healthy
     healthcheck:
       # 503 (status DOWN, e.g. database unreachable) makes wget fail, so the check fails

@@ -18,10 +18,16 @@ import pt.ua.deti.tqs.p11.application.fleet.HubNotFoundException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleHasOpenTicketException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleNotFoundException;
+import pt.ua.deti.tqs.p11.application.pass.PaymentDeclinedException;
+import pt.ua.deti.tqs.p11.application.pass.PaymentTimedOutException;
+import pt.ua.deti.tqs.p11.application.pass.UnknownPassTypeException;
+import pt.ua.deti.tqs.p11.application.pass.UnknownStayCodeException;
 import pt.ua.deti.tqs.p11.application.user.UserNotFoundException;
 import pt.ua.deti.tqs.p11.domain.fleet.CapacityBelowVehiclesHeldException;
 import pt.ua.deti.tqs.p11.domain.fleet.ForbiddenTransitionException;
 import pt.ua.deti.tqs.p11.domain.fleet.HubFullException;
+import pt.ua.deti.tqs.p11.domain.pass.StayCodeLinkedToAnotherAccountException;
+import pt.ua.deti.tqs.p11.domain.pass.StayCodeNotValidTodayException;
 import pt.ua.deti.tqs.p11.domain.user.FieldTechnicianRequiresOperatorException;
 import pt.ua.deti.tqs.p11.domain.user.ProtectedAccountException;
 
@@ -33,6 +39,8 @@ import pt.ua.deti.tqs.p11.domain.user.ProtectedAccountException;
 class ApiExceptionHandler {
 
   private static final String INVALID_FIELDS = "The request has invalid fields";
+  private static final String STAY_CODE = "stayCode";
+  private static final String PAYMENT = "payment";
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   ProblemDetail invalidRequest(MethodArgumentNotValidException e) {
@@ -123,6 +131,48 @@ class ApiExceptionHandler {
   @ExceptionHandler(CapacityBelowVehiclesHeldException.class)
   ProblemDetail capacityBelowVehiclesHeld(CapacityBelowVehiclesHeldException e) {
     return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("capacity", e.getMessage()));
+  }
+
+  // US03: a refused purchase. Nothing is charged for a field error; no pass without payment.
+
+  @ExceptionHandler(UnknownPassTypeException.class)
+  ProblemDetail unknownPassType(UnknownPassTypeException e) {
+    return problem(HttpStatus.BAD_REQUEST, INVALID_FIELDS, Map.of("passTypeId", "is unknown"));
+  }
+
+  /** BR9. The tourist can buy again without the code, at the base price. */
+  @ExceptionHandler(UnknownStayCodeException.class)
+  ProblemDetail unknownStayCode(UnknownStayCodeException e) {
+    return problem(HttpStatus.BAD_REQUEST, INVALID_FIELDS, Map.of(STAY_CODE, "is unknown"));
+  }
+
+  /** BR9: before check-in or after check-out, on the hotel's calendar. */
+  @ExceptionHandler(StayCodeNotValidTodayException.class)
+  ProblemDetail stayCodeNotValidToday(StayCodeNotValidTodayException e) {
+    return problem(HttpStatus.BAD_REQUEST, INVALID_FIELDS, Map.of(STAY_CODE, "is not valid today"));
+  }
+
+  /** BR9. Which account it is linked to is not said. */
+  @ExceptionHandler(StayCodeLinkedToAnotherAccountException.class)
+  ProblemDetail stayCodeOfAnotherAccount(StayCodeLinkedToAnotherAccountException e) {
+    return problem(
+        HttpStatus.BAD_REQUEST, INVALID_FIELDS, Map.of(STAY_CODE, "is linked to another account"));
+  }
+
+  /** BR10: declined, so no pass. The gateway's reason is not shown to the client. */
+  @ExceptionHandler(PaymentDeclinedException.class)
+  ProblemDetail paymentDeclined(PaymentDeclinedException e) {
+    return problem(
+        HttpStatus.PAYMENT_REQUIRED, "The payment was declined", Map.of(PAYMENT, "was declined"));
+  }
+
+  /** BR10: no answer in time, so no pass. Trying again is safe (the gateway is idempotent). */
+  @ExceptionHandler(PaymentTimedOutException.class)
+  ProblemDetail paymentTimedOut(PaymentTimedOutException e) {
+    return problem(
+        HttpStatus.GATEWAY_TIMEOUT,
+        "The payment got no answer in time",
+        Map.of(PAYMENT, "got no answer in time; try again"));
   }
 
   /** BR16: the action is not allowed in the vehicle's current state, or not yet. */

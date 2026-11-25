@@ -47,6 +47,14 @@ class SecurityConfiguration {
                 .permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health")
                 .permitAll()
+                // API documentation (OpenAPI description and Swagger UI): read only, no data.
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/v3/api-docs",
+                    "/v3/api-docs/**",
+                    "/swagger-ui.html",
+                    "/swagger-ui/**")
+                .permitAll()
                 // Errors such as malformed JSON are forwarded to /error; keep their status.
                 .requestMatchers("/error")
                 .permitAll()
@@ -95,7 +103,12 @@ class SecurityConfiguration {
                 .requestMatchers(HttpMethod.PUT, "/usage-rules")
                 .hasAnyRole(CLIENT_MANAGER, ADMIN)
                 // Tourist flows (US03-US07). Ownership of a booking is checked in its story.
-                .requestMatchers(HttpMethod.GET, "/passes", "/bookings", "/bookings/{id}")
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/pass-types/{id}/price",
+                    "/passes",
+                    "/bookings",
+                    "/bookings/{id}")
                 .hasAnyRole(END_USER, ADMIN)
                 .requestMatchers(
                     HttpMethod.POST,

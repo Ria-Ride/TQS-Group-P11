@@ -264,7 +264,7 @@ All containers join one private Compose network and reach each other by service 
 | `db` | PostgreSQL | Persistence of every module | 5432, internal | none |
 | `broker` | Eclipse Mosquitto 2.0.22 (MQTT) | Carries telemetry from the simulator to the backend | 1883, internal | none |
 | `simulator` | Fleet telemetry simulator (Java 21, Spring Boot; image `ghcr.io/o-reis/tqs-telemetry-simulator`, release pinned in Compose) | Publishes vehicle readings (battery, position, lock state, faults) | none | `broker` (MQTT) |
-| `payment-gateway` | Simulated payment gateway **[stack TBD]** | Charges, authorizes, captures and releases deposits | internal **[TBD]** | none |
+| `payment-gateway` | Simulated payment gateway: Java 21, Spring Boot 4 (`proj/payment-gateway`) | Charges passes now (US03); authorize, capture and release of deposits come with US04-US06. A test card in each charge decides the answer (`tok_approve`, `tok_decline`, `tok_timeout`) | 8080, internal | none |
 
 The database keeps its data in the named volume `db-data`, so data survives a restart or a rebuild of the containers. Credentials come from a git-ignored `.env` file on each machine; the repository holds only `.env.example` with placeholder values.
 
@@ -280,5 +280,5 @@ The database keeps its data in the named volume `db-data`, so data survives a re
 - [TBD] How `main` reaches the VM (continuous delivery, D4): the deployment job in GitHub Actions and how it connects to the VM.
 - [TBD] Representative data loaded on deployment (D4).
 - [TBD] Staging next to production (D5, valued): for example a second Compose project on the same VM with other ports.
-- [TBD] MQTT broker product, simulator and payment gateway stacks, and image versions.
+- [TBD] MQTT broker product, simulator stack, and image versions.
 - [TBD] Observability containers if adopted (D6, valued: Prometheus and Grafana).

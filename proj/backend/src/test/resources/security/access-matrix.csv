@@ -3,6 +3,7 @@ method,path,ANONYMOUS,END_USER,OPERATOR,CLIENT_MANAGER,ADMIN
 POST,/auth/guest,Y,Y,Y,Y,Y
 POST,/auth/login,Y,Y,Y,Y,Y
 GET,/actuator/health,Y,Y,Y,Y,Y
+GET,/v3/api-docs,Y,Y,Y,Y,Y
 GET,/users/me,N,Y,Y,Y,Y
 GET,/users/{id},N,OWN,OWN,OWN,Y
 GET,/admin/users,N,N,N,N,Y
@@ -24,6 +25,7 @@ PATCH,/vehicle-types/{type},N,N,N,Y,Y
 GET,/usage-rules,N,Y,Y,Y,Y
 PUT,/usage-rules,N,N,N,Y,Y
 GET,/pass-types,N,Y,Y,Y,Y
+GET,/pass-types/{id}/price,N,Y,N,N,Y
 POST,/pass-types,N,N,N,Y,Y
 PATCH,/pass-types/{id},N,N,N,Y,Y
 GET,/stay-codes,N,N,N,Y,Y
