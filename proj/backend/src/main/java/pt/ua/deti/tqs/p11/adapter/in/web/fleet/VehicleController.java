@@ -56,6 +56,7 @@ class VehicleController {
           case START_MOVE -> vehicles.startMove(id);
           case CONFIRM_ARRIVAL -> vehicles.confirmArrival(id, request.hubId());
           case RETIRE -> vehicles.retire(id);
+          case REPORT_FAULT -> throw new UnsupportedOperationException("US10");
         };
     return VehicleResponse.from(vehicle);
   }

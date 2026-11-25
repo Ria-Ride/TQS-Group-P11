@@ -30,7 +30,13 @@ public enum VehicleState {
       case START_MOVE -> to(IN_TRANSIT, action, EnumSet.of(AVAILABLE));
       case CONFIRM_ARRIVAL -> to(AVAILABLE, action, EnumSet.of(IN_TRANSIT));
       case RETIRE -> to(RETIRED, action, EnumSet.of(DEACTIVATED, AVAILABLE, MAINTENANCE));
+      case REPORT_FAULT -> throw new UnsupportedOperationException("US10");
     };
+  }
+
+  /** Whether the lifecycle has a transition for the action from this state. */
+  public boolean allows(VehicleAction action) {
+    throw new UnsupportedOperationException("US10");
   }
 
   /**

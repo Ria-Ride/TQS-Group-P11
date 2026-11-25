@@ -269,6 +269,21 @@ class VehicleApiIT {
     assertThat(errors(response)).containsOnlyKeys("action");
   }
 
+  /**
+   * BR18: a fault reaches maintenance through telemetry or a ticket (US10), never as an operator
+   * transition, so the vehicle cannot skip its ticket.
+   */
+  @Test
+  void transition_reportFault_returns400OnTheActionAndChangesNothing() {
+    UUID bike = availableBike();
+
+    ResponseEntity<Map<String, Object>> response = operator.transition(bike, "REPORT_FAULT");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(errors(response)).containsOnlyKeys("action");
+    assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "AVAILABLE");
+  }
+
   @Test
   void transition_unknownVehicle_returns404() {
     ResponseEntity<Map<String, Object>> response =
