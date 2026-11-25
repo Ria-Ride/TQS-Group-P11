@@ -186,7 +186,9 @@ public record Vehicle(
    * is not offered stays out of service. The fault itself is recorded by its ticket.
    */
   public Vehicle reportFault() {
-    throw new UnsupportedOperationException("US10");
+    return state.allows(VehicleAction.REPORT_FAULT)
+        ? transition(VehicleAction.REPORT_FAULT, hubId)
+        : this;
   }
 
   /**

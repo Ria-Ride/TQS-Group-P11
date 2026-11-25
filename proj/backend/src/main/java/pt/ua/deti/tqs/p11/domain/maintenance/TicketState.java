@@ -10,6 +10,9 @@ public enum TicketState {
 
   /** BR20: whether the ticket still needs work (Open, Assigned or InProgress). */
   public boolean isOpen() {
-    throw new UnsupportedOperationException("US10");
+    return switch (this) {
+      case OPEN, ASSIGNED, IN_PROGRESS -> true;
+      case CLOSED, CANCELLED -> false;
+    };
   }
 }

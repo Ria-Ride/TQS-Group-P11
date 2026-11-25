@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import pt.ua.deti.tqs.p11.adapter.in.web.InvalidFieldException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleLifecycleUseCase;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 
@@ -56,7 +57,10 @@ class VehicleController {
           case START_MOVE -> vehicles.startMove(id);
           case CONFIRM_ARRIVAL -> vehicles.confirmArrival(id, request.hubId());
           case RETIRE -> vehicles.retire(id);
-          case REPORT_FAULT -> throw new UnsupportedOperationException("US10");
+          // BR18: a fault reaches Maintenance only with its ticket (telemetry or POST /tickets).
+          case REPORT_FAULT ->
+              throw new InvalidFieldException(
+                  "action", "is reported by telemetry or a maintenance ticket, not by an operator");
         };
     return VehicleResponse.from(vehicle);
   }

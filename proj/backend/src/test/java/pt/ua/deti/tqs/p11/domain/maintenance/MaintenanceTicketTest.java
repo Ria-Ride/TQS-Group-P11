@@ -38,12 +38,7 @@ class MaintenanceTicketTest {
 
   private static User account(UUID id, Role role, boolean fieldTechnician) {
     return User.account(
-        id,
-        "Tiago Lopes",
-        new EmailAddress(id + "@example.com"),
-        "hash",
-        role,
-        fieldTechnician);
+        id, "Tiago Lopes", new EmailAddress(id + "@example.com"), "hash", role, fieldTechnician);
   }
 
   private static User technician(UUID id) {
@@ -88,7 +83,8 @@ class MaintenanceTicketTest {
   @Test
   void openFromFault_otherSla_movesTheDeadline() {
     MaintenanceTicket ticket =
-        MaintenanceTicket.openFromFault(TICKET, VEHICLE, BRAKE_WEAR, OPENED_AT, Duration.ofHours(8));
+        MaintenanceTicket.openFromFault(
+            TICKET, VEHICLE, BRAKE_WEAR, OPENED_AT, Duration.ofHours(8));
 
     assertThat(ticket.slaDeadline()).isEqualTo(Instant.parse("2026-11-10T18:00:00Z"));
   }
@@ -119,24 +115,21 @@ class MaintenanceTicketTest {
   @ParameterizedTest
   @ValueSource(strings = {"", "   "})
   void openManually_blankDescription_isRejected(String description) {
-    assertThatThrownBy(
-            () ->
-                MaintenanceTicket.openManually(
-                    TICKET, VEHICLE, BRAKE_WEAR, description, OPERATOR, OPENED_AT, SLA))
+    assertThatThrownBy(() ->
+            MaintenanceTicket.openManually(
+                TICKET, VEHICLE, BRAKE_WEAR, description, OPERATOR, OPENED_AT, SLA))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void openManually_withoutOperatorOrDescription_isRejected() {
-    assertThatThrownBy(
-            () ->
-                MaintenanceTicket.openManually(
-                    TICKET, VEHICLE, BRAKE_WEAR, null, OPERATOR, OPENED_AT, SLA))
+    assertThatThrownBy(() ->
+            MaintenanceTicket.openManually(
+                TICKET, VEHICLE, BRAKE_WEAR, null, OPERATOR, OPENED_AT, SLA))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(
-            () ->
-                MaintenanceTicket.openManually(
-                    TICKET, VEHICLE, BRAKE_WEAR, "Brakes squeak", null, OPENED_AT, SLA))
+    assertThatThrownBy(() ->
+            MaintenanceTicket.openManually(
+                TICKET, VEHICLE, BRAKE_WEAR, "Brakes squeak", null, OPENED_AT, SLA))
         .isInstanceOf(NullPointerException.class);
   }
 
@@ -200,19 +193,24 @@ class MaintenanceTicketTest {
 
     assertThatThrownBy(() -> ticket.assignTo(technician(RITA)))
         .isInstanceOfSatisfying(
-            ForbiddenTicketTransitionException.class,
-            e -> assertThat(e.from()).isEqualTo(state));
+            ForbiddenTicketTransitionException.class, e -> assertThat(e.from()).isEqualTo(state));
   }
 
   // ------------------------------------------------------------- invariants
 
   @Test
   void new_deadlineNotAfterOpening_isRejected() {
-    assertThatThrownBy(
-            () ->
-                new MaintenanceTicket(
-                    TICKET, VEHICLE, BRAKE_WEAR, null, TicketState.OPEN, OPENED_AT, OPENED_AT,
-                    null, null))
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET,
+                VEHICLE,
+                BRAKE_WEAR,
+                null,
+                TicketState.OPEN,
+                OPENED_AT,
+                OPENED_AT,
+                null,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -233,35 +231,29 @@ class MaintenanceTicketTest {
     Instant deadline = OPENED_AT.plus(SLA);
     TicketState open = TicketState.OPEN;
 
-    assertThatThrownBy(
-            () ->
-                new MaintenanceTicket(
-                    null, VEHICLE, BRAKE_WEAR, null, open, OPENED_AT, deadline, null, null))
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                null, VEHICLE, BRAKE_WEAR, null, open, OPENED_AT, deadline, null, null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(
-            () ->
-                new MaintenanceTicket(
-                    TICKET, null, BRAKE_WEAR, null, open, OPENED_AT, deadline, null, null))
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET, null, BRAKE_WEAR, null, open, OPENED_AT, deadline, null, null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(
-            () ->
-                new MaintenanceTicket(
-                    TICKET, VEHICLE, null, null, open, OPENED_AT, deadline, null, null))
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET, VEHICLE, null, null, open, OPENED_AT, deadline, null, null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(
-            () ->
-                new MaintenanceTicket(
-                    TICKET, VEHICLE, BRAKE_WEAR, null, null, OPENED_AT, deadline, null, null))
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET, VEHICLE, BRAKE_WEAR, null, null, OPENED_AT, deadline, null, null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(
-            () ->
-                new MaintenanceTicket(
-                    TICKET, VEHICLE, BRAKE_WEAR, null, open, null, deadline, null, null))
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET, VEHICLE, BRAKE_WEAR, null, open, null, deadline, null, null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(
-            () ->
-                new MaintenanceTicket(
-                    TICKET, VEHICLE, BRAKE_WEAR, null, open, OPENED_AT, null, null, null))
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET, VEHICLE, BRAKE_WEAR, null, open, OPENED_AT, null, null, null))
         .isInstanceOf(NullPointerException.class);
   }
 }

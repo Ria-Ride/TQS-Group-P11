@@ -27,7 +27,8 @@ class FaultCodeTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", "brake_wear", "Brake_Wear", "42_ERROR", "_BRAKE", "BRAKE-WEAR", "A B"})
+  @ValueSource(
+      strings = {"", "brake_wear", "Brake_Wear", "42_ERROR", "_BRAKE", "BRAKE-WEAR", "A B"})
   void of_notUpperSnakeCase_isRejected(String value) {
     assertThatThrownBy(() -> FaultCode.of(value)).isInstanceOf(IllegalArgumentException.class);
   }
