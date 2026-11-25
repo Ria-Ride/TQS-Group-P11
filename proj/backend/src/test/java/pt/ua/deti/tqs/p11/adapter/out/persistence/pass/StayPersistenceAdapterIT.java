@@ -86,6 +86,12 @@ class StayPersistenceAdapterIT {
   }
 
   @Test
+  void findByCode_readsTheStayWithoutATransaction() {
+    assertThat(stays.findByCode("IT-1001")).get().extracting(Stay::id).isEqualTo(STAY_ID);
+    assertThat(stays.findByCode("IT-9999")).isEmpty();
+  }
+
+  @Test
   void findByCodeForUpdate_unknownCode_isEmpty() {
     assertThat(findLocked("IT-9999")).isEmpty();
   }

@@ -1,6 +1,5 @@
 package pt.ua.deti.tqs.p11.application.pass;
 
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,9 +22,6 @@ public record BuyPassCommand(
 
   /** The stay code as stored (trimmed, upper-case), if one was given. */
   public Optional<String> normalizedStayCode() {
-    return Optional.ofNullable(stayCode)
-        .map(String::strip)
-        .filter(code -> !code.isEmpty())
-        .map(code -> code.toUpperCase(Locale.ROOT));
+    return StayCodes.normalize(stayCode);
   }
 }

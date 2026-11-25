@@ -103,7 +103,12 @@ class SecurityConfiguration {
                 .requestMatchers(HttpMethod.PUT, "/usage-rules")
                 .hasAnyRole(CLIENT_MANAGER, ADMIN)
                 // Tourist flows (US03-US07). Ownership of a booking is checked in its story.
-                .requestMatchers(HttpMethod.GET, "/passes", "/bookings", "/bookings/{id}")
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/pass-types/{id}/price",
+                    "/passes",
+                    "/bookings",
+                    "/bookings/{id}")
                 .hasAnyRole(END_USER, ADMIN)
                 .requestMatchers(
                     HttpMethod.POST,

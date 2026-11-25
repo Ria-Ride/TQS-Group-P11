@@ -9,8 +9,10 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pt.ua.deti.tqs.p11.application.pass.PassPurchaseUseCase;
@@ -34,6 +36,24 @@ class PassController {
   @Operation(summary = "The pass types, shortest validity first, with base price and validity")
   List<PassTypeResponse> passTypes() {
     return passes.passTypes().stream().map(PassTypeResponse::from).toList();
+  }
+
+  @GetMapping("/pass-types/{id}/price")
+  @Operation(
+      summary = "What the pass would cost the caller now",
+      description =
+          "With a stay code, the price after the hotel's discount if the code is valid for the"
+              + " caller today (BR9). Nothing is charged or linked; the purchase checks again.")
+  @ApiResponse(responseCode = "200", description = "The price, and the discount applied")
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "passTypeId unknown, or stayCode unknown, not valid today or of another account")
+  PriceQuoteResponse price(
+      @PathVariable UUID id,
+      @RequestParam(required = false) String stayCode,
+      Authentication caller) {
+    return PriceQuoteResponse.from(passes.quote(accountOf(caller), id, stayCode));
   }
 
   @PostMapping("/passes")

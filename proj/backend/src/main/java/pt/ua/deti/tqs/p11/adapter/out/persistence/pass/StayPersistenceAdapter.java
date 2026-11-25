@@ -20,6 +20,11 @@ class StayPersistenceAdapter implements StayRepository {
     return repository.findWithLockByCode(code).map(StayJpaEntity::toDomain);
   }
 
+  @Override
+  public Optional<Stay> findByCode(String code) {
+    return repository.findByCode(code).map(StayJpaEntity::toDomain);
+  }
+
   /**
    * Updates the linked account of the stored row, locked by findByCodeForUpdate in the same
    * transaction. The rest of the stay is never written from here.

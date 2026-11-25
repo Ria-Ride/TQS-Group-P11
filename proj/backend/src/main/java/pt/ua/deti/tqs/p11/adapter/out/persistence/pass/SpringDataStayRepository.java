@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.Lock;
 
 interface SpringDataStayRepository extends JpaRepository<StayJpaEntity, UUID> {
 
+  /** A plain read, for showing a price before paying. */
+  Optional<StayJpaEntity> findByCode(String code);
+
   /** SELECT ... FOR UPDATE: the row stays locked until the transaction ends. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<StayJpaEntity> findWithLockByCode(String code);

@@ -13,6 +13,9 @@ public interface StayRepository {
    */
   Optional<Stay> findByCodeForUpdate(String code);
 
+  /** Finds the stay with this code (stored upper-case), without locking it. */
+  Optional<Stay> findByCode(String code);
+
   /** Stores the account the code is linked to; the rest of a stay does not change here. */
   void save(Stay stay);
 }

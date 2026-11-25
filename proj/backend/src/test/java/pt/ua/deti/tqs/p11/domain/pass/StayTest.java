@@ -118,6 +118,34 @@ class StayTest {
         .isInstanceOf(StayCodeNotValidTodayException.class);
   }
 
+  // ------------------------------------------------------------- checking without linking (quote)
+
+  @Test
+  void checkRedeemableBy_aValidCode_linksNothing() {
+    Stay stay = stay(null);
+
+    stay.checkRedeemableBy(ANA, CHECK_IN);
+
+    assertThat(stay.redeemedBy()).isEmpty();
+  }
+
+  @Test
+  void checkRedeemableBy_theDayAfterCheckOut_isRefused() {
+    Stay stay = stay(null);
+    LocalDate dayAfter = CHECK_OUT.plusDays(1);
+
+    assertThatThrownBy(() -> stay.checkRedeemableBy(ANA, dayAfter))
+        .isInstanceOf(StayCodeNotValidTodayException.class);
+  }
+
+  @Test
+  void checkRedeemableBy_anotherAccount_isRefused() {
+    Stay stay = stay(RUI);
+
+    assertThatThrownBy(() -> stay.checkRedeemableBy(ANA, CHECK_IN))
+        .isInstanceOf(StayCodeLinkedToAnotherAccountException.class);
+  }
+
   // ------------------------------------------------------------- undo after a failed payment
 
   @Test

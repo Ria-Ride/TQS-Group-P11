@@ -25,6 +25,7 @@ PATCH,/vehicle-types/{type},N,N,N,Y,Y
 GET,/usage-rules,N,Y,Y,Y,Y
 PUT,/usage-rules,N,N,N,Y,Y
 GET,/pass-types,N,Y,Y,Y,Y
+GET,/pass-types/{id}/price,N,Y,N,N,Y
 POST,/pass-types,N,N,N,Y,Y
 PATCH,/pass-types/{id},N,N,N,Y,Y
 GET,/stay-codes,N,N,N,Y,Y

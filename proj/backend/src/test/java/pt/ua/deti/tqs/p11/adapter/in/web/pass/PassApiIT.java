@@ -162,6 +162,47 @@ class PassApiIT {
         .containsEntry("vehicleTypes", List.of("E_BIKE", "E_SCOOTER"));
   }
 
+  private ResponseEntity<Map<String, Object>> price(Registered who, String query) {
+    return http.get()
+        .uri("/pass-types/" + DAY_ID + "/price" + query)
+        .header("Authorization", "Bearer " + who.token())
+        .retrieve()
+        .toEntity(ApiClient.JSON_OBJECT);
+  }
+
+  @Test
+  void price_withoutAStayCode_isTheBasePrice() {
+    ResponseEntity<Map<String, Object>> response = price(ana, "");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody())
+        .containsEntry("basePrice", "10.00")
+        .containsEntry("price", "10.00")
+        .containsEntry("discountPercent", 0)
+        .containsEntry("currency", "EUR");
+  }
+
+  /** The discount is shown before paying, and the code stays free: nothing was bought yet. */
+  @Test
+  void price_withAValidStayCode_isDiscountedAndLinksNothing() {
+    stayRunningToday("API-1002");
+
+    ResponseEntity<Map<String, Object>> response = price(ana, "?stayCode=api-1002");
+
+    assertThat(response.getBody())
+        .containsEntry("price", "9.00")
+        .containsEntry("discountPercent", 10);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT redeemed_by FROM stays WHERE code = 'API-1002'", UUID.class))
+        .isNull();
+  }
+
+  @Test
+  void price_unknownStayCode_is400OnTheStayCodeField() {
+    assertFieldError(price(ana, "?stayCode=API-NOPE"), HttpStatus.BAD_REQUEST, "stayCode");
+  }
+
   @Test
   void buy_approved_is201WithThePassAndItIsListedForTheBuyerOnly() {
     ResponseEntity<Map<String, Object>> response = buy(ana, null, "tok_approve");

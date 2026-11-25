@@ -55,18 +55,28 @@ public class Stay {
    * @throws StayCodeLinkedToAnotherAccountException if another account already uses the code
    */
   public boolean redeemBy(UUID account, LocalDate today) {
-    Objects.requireNonNull(account, "account");
-    if (today.isBefore(checkIn) || today.isAfter(checkOut)) {
-      throw new StayCodeNotValidTodayException(code, today, checkIn, checkOut);
-    }
+    checkRedeemableBy(account, today);
     if (redeemedBy == null) {
       redeemedBy = account;
       return true;
     }
-    if (!redeemedBy.equals(account)) {
+    return false;
+  }
+
+  /**
+   * The checks of {@link #redeemBy} without linking anything, to show a price before paying.
+   *
+   * @throws StayCodeNotValidTodayException before check-in or after check-out
+   * @throws StayCodeLinkedToAnotherAccountException if another account already uses the code
+   */
+  public void checkRedeemableBy(UUID account, LocalDate today) {
+    Objects.requireNonNull(account, "account");
+    if (today.isBefore(checkIn) || today.isAfter(checkOut)) {
+      throw new StayCodeNotValidTodayException(code, today, checkIn, checkOut);
+    }
+    if (redeemedBy != null && !redeemedBy.equals(account)) {
       throw new StayCodeLinkedToAnotherAccountException(code);
     }
-    return false;
   }
 
   /** Frees the code again, after a payment that followed a new link was not approved (BR10). */

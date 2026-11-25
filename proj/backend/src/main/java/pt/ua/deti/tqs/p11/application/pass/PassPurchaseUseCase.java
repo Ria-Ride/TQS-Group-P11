@@ -77,6 +77,31 @@ public class PassPurchaseUseCase {
     return passTypes.findAll();
   }
 
+  /**
+   * What the pass would cost the account now, with the stay discount when the code is valid (BR9).
+   * Reads only: nothing is locked, linked or charged, so the purchase checks again.
+   *
+   * @param stayCode the code the tourist typed, or null or blank for none
+   * @throws UnknownPassTypeException if there is no such pass type
+   * @throws UnknownStayCodeException if no stay has the code
+   * @throws pt.ua.deti.tqs.p11.domain.pass.StayCodeNotValidTodayException outside the stay
+   * @throws pt.ua.deti.tqs.p11.domain.pass.StayCodeLinkedToAnotherAccountException if another
+   *     account uses the code
+   */
+  public PriceQuote quote(UUID accountId, UUID passTypeId, String stayCode) {
+    PassType type =
+        passTypes.findById(passTypeId).orElseThrow(() -> new UnknownPassTypeException(passTypeId));
+    Optional<String> code = StayCodes.normalize(stayCode);
+    if (code.isEmpty()) {
+      return new PriceQuote(type.id(), type.basePrice(), type.basePrice(), 0);
+    }
+    Stay stay =
+        stays.findByCode(code.get()).orElseThrow(() -> new UnknownStayCodeException(code.get()));
+    stay.checkRedeemableBy(accountId, today());
+    return new PriceQuote(
+        type.id(), type.basePrice(), type.priceWith(stay), stay.discountPercent());
+  }
+
   /** The account's passes, newest first. */
   public List<Pass> passesOf(UUID accountId) {
     return passes.findByAccount(accountId);

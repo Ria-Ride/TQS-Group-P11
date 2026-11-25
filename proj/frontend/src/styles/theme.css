@@ -355,3 +355,69 @@ a:hover {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* US03: buy a pass page */
+.field-label {
+  font-weight: 700;
+}
+
+.choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+/* A whole row is the tap target (at least 48 px tall), not only the small radio button. */
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-width: 2px;
+  border-color: var(--color-ria);
+}
+
+/* .field input makes text inputs full width; radios keep their own size. */
+.field .choice input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  flex: none;
+}
+
+/* The stay code and its button side by side; stacked on narrow phones. */
+.code-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.code-row input {
+  flex: 1 1 12rem;
+}
+
+.field-error p {
+  margin: 0 0 8px;
+}
+
+.pass-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0 0 16px;
+}
+
+.pass-details dt {
+  font-weight: 700;
+}
+
+.pass-details dd {
+  margin: 0;
+}

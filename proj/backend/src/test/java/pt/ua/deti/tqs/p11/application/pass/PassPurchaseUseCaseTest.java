@@ -300,6 +300,60 @@ class PassPurchaseUseCaseTest {
     assertThat(gateway.charges()).isEmpty();
   }
 
+  // ------------------------------------------------------------- price before paying (quote)
+
+  @Test
+  void quote_withoutAStayCode_isTheBasePriceWithNoDiscount() {
+    dayPassExists();
+
+    assertThat(useCase.quote(ANA, DAY.id(), null))
+        .isEqualTo(new PriceQuote(DAY.id(), Money.of("10.00"), Money.of("10.00"), 0));
+  }
+
+  /** The tourist sees the discount before paying; nothing is locked, linked or charged. */
+  @Test
+  void quote_withAValidStayCode_isTheDiscountedPriceAndChangesNothing() {
+    dayPassExists();
+    Stay stay = stay(LISBON_TODAY.minusDays(1), LISBON_TODAY.plusDays(1), null);
+    when(stays.findByCode("RIA-1001")).thenReturn(Optional.of(stay));
+
+    PriceQuote quote = useCase.quote(ANA, DAY.id(), " ria-1001 ");
+
+    assertThat(quote).isEqualTo(new PriceQuote(DAY.id(), Money.of("10.00"), Money.of("9.00"), 10));
+    assertThat(stay.redeemedBy()).isEmpty();
+    verify(stays, never()).findByCodeForUpdate(any());
+    verify(stays, never()).save(any());
+    assertThat(gateway.charges()).isEmpty();
+  }
+
+  @Test
+  void quote_unknownStayCode_isRefused() {
+    dayPassExists();
+    when(stays.findByCode("NOPE-0000")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> useCase.quote(ANA, DAY.id(), "NOPE-0000"))
+        .isInstanceOf(UnknownStayCodeException.class);
+  }
+
+  @Test
+  void quote_stayCodeOfAnotherAccount_isRefused() {
+    dayPassExists();
+    when(stays.findByCode("RIA-1001"))
+        .thenReturn(Optional.of(stay(LISBON_TODAY.minusDays(1), LISBON_TODAY.plusDays(1), RUI)));
+
+    assertThatThrownBy(() -> useCase.quote(ANA, DAY.id(), "RIA-1001"))
+        .isInstanceOf(StayCodeLinkedToAnotherAccountException.class);
+  }
+
+  @Test
+  void quote_unknownPassType_isRefused() {
+    when(passTypes.findById(DAY.id())).thenReturn(Optional.empty());
+    UUID type = DAY.id();
+
+    assertThatThrownBy(() -> useCase.quote(ANA, type, null))
+        .isInstanceOf(UnknownPassTypeException.class);
+  }
+
   @Test
   void passesOf_returnsTheAccountsPasses() {
     Pass pass = Pass.issue(PASS_ID, ANA, DAY, null, Money.of("10.00"), NOW);
