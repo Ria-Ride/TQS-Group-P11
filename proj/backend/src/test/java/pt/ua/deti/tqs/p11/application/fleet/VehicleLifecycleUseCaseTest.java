@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -317,5 +318,69 @@ class VehicleLifecycleUseCaseTest {
     when(vehicles.findById(BIKE_ID)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> useCase.get(BIKE_ID)).isInstanceOf(VehicleNotFoundException.class);
+  }
+
+    // ------------------------------------------------------------- start of a use (US04)
+
+  /** K3: the booking's check and the change run on the locked vehicle, in one operation. */
+  @Test
+  void startUse_availableVehicle_isInUseAndTheChangeIsRecorded() {
+    when(vehicles.findByIdForUpdate(BIKE_ID))
+        .thenReturn(Optional.of(bikeAtHub03(VehicleState.AVAILABLE)));
+    when(vehicles.save(any())).then(returnsFirstArg());
+
+    Vehicle vehicle = useCase.startUse(BIKE_ID, locked -> {});
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.IN_USE);
+    assertThat(vehicle.currentHub()).isEmpty();
+    verify(history)
+        .save(
+            new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.IN_USE, T0));
+  }
+
+  @Test
+  void startUse_checkSeesTheLockedVehicleBeforeTheChange() {
+    Vehicle locked = bikeAtHub03(VehicleState.AVAILABLE);
+    when(vehicles.findByIdForUpdate(BIKE_ID)).thenReturn(Optional.of(locked));
+    when(vehicles.save(any())).then(returnsFirstArg());
+    AtomicReference<Vehicle> seen = new AtomicReference<>();
+
+    useCase.startUse(BIKE_ID, seen::set);
+
+    assertThat(seen.get()).isEqualTo(locked);
+  }
+
+  /** The booking rules refuse on the locked vehicle: nothing is saved or recorded. */
+  @Test
+  void startUse_checkRefuses_savesAndRecordsNothing() {
+    when(vehicles.findByIdForUpdate(BIKE_ID))
+        .thenReturn(Optional.of(bikeAtHub03(VehicleState.AVAILABLE)));
+    IllegalStateException refusal = new IllegalStateException("refused by the booking rules");
+
+    assertThatThrownBy(() -> useCase.startUse(BIKE_ID, locked -> {
+          throw refusal;
+        }))
+        .isSameAs(refusal);
+    verify(vehicles, never()).save(any());
+    verifyNoInteractions(history);
+  }
+
+  @Test
+  void startUse_vehicleNotAvailable_isRefusedAndNothingIsSaved() {
+    when(vehicles.findByIdForUpdate(BIKE_ID))
+        .thenReturn(Optional.of(bikeAtHub03(VehicleState.RESERVED)));
+
+    assertThatThrownBy(() -> useCase.startUse(BIKE_ID, locked -> {}))
+        .isInstanceOf(ForbiddenTransitionException.class);
+    verify(vehicles, never()).save(any());
+    verifyNoInteractions(history);
+  }
+
+  @Test
+  void startUse_unknownVehicle_isNotFound() {
+    when(vehicles.findByIdForUpdate(BIKE_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> useCase.startUse(BIKE_ID, locked -> {}))
+        .isInstanceOf(VehicleNotFoundException.class);
   }
 }

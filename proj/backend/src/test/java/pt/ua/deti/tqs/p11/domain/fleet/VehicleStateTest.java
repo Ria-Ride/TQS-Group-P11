@@ -13,6 +13,8 @@ import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.DEACTIVATED;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_TRANSIT;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.MAINTENANCE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.RETIRED;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_USE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_USE;
 
 import java.util.Arrays;
 import java.util.List;
@@ -38,7 +40,9 @@ class VehicleStateTest {
           arguments(IN_TRANSIT, CONFIRM_ARRIVAL, AVAILABLE),
           arguments(DEACTIVATED, RETIRE, RETIRED),
           arguments(AVAILABLE, RETIRE, RETIRED),
-          arguments(MAINTENANCE, RETIRE, RETIRED));
+          arguments(MAINTENANCE, RETIRE, RETIRED),
+          arguments(AVAILABLE, START_USE, IN_USE));
+          
 
   static Stream<Arguments> allowedTransitions() {
     return ALLOWED.stream();
