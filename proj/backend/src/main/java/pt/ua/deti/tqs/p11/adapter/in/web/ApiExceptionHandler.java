@@ -18,6 +18,9 @@ import pt.ua.deti.tqs.p11.application.fleet.HubNotFoundException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleHasOpenTicketException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleNotFoundException;
+import pt.ua.deti.tqs.p11.application.maintenance.FaultAlreadyCoveredException;
+import pt.ua.deti.tqs.p11.application.maintenance.TicketNotFoundException;
+import pt.ua.deti.tqs.p11.application.maintenance.VehicleRetiredException;
 import pt.ua.deti.tqs.p11.application.pass.PaymentDeclinedException;
 import pt.ua.deti.tqs.p11.application.pass.PaymentTimedOutException;
 import pt.ua.deti.tqs.p11.application.pass.UnknownPassTypeException;
@@ -26,6 +29,8 @@ import pt.ua.deti.tqs.p11.application.user.UserNotFoundException;
 import pt.ua.deti.tqs.p11.domain.fleet.CapacityBelowVehiclesHeldException;
 import pt.ua.deti.tqs.p11.domain.fleet.ForbiddenTransitionException;
 import pt.ua.deti.tqs.p11.domain.fleet.HubFullException;
+import pt.ua.deti.tqs.p11.domain.maintenance.ForbiddenTicketTransitionException;
+import pt.ua.deti.tqs.p11.domain.maintenance.NotAFieldTechnicianException;
 import pt.ua.deti.tqs.p11.domain.pass.StayCodeLinkedToAnotherAccountException;
 import pt.ua.deti.tqs.p11.domain.pass.StayCodeNotValidTodayException;
 import pt.ua.deti.tqs.p11.domain.user.FieldTechnicianRequiresOperatorException;
@@ -77,7 +82,8 @@ class ApiExceptionHandler {
   @ExceptionHandler({
     UserNotFoundException.class,
     HubNotFoundException.class,
-    VehicleNotFoundException.class
+    VehicleNotFoundException.class,
+    TicketNotFoundException.class
   })
   ProblemDetail notFound(RuntimeException e) {
     return problem(HttpStatus.NOT_FOUND, e.getMessage(), Map.of());
@@ -179,5 +185,39 @@ class ApiExceptionHandler {
   @ExceptionHandler({ForbiddenTransitionException.class, VehicleHasOpenTicketException.class})
   ProblemDetail transitionRefused(RuntimeException e) {
     return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("action", e.getMessage()));
+  }
+
+  // US10: maintenance tickets.
+
+  /** BR20: the fault is covered; ticketId is the open ticket, so the operator can go to it. */
+  @ExceptionHandler(FaultAlreadyCoveredException.class)
+  ProblemDetail faultAlreadyCovered(FaultAlreadyCoveredException e) {
+    ProblemDetail problem =
+        problem(
+            HttpStatus.CONFLICT,
+            e.getMessage(),
+            Map.of("faultCode", "is already covered by an open ticket"));
+    e.existingTicketId().ifPresent(id -> problem.setProperty("ticketId", id));
+    return problem;
+  }
+
+  @ExceptionHandler(VehicleRetiredException.class)
+  ProblemDetail vehicleRetired(VehicleRetiredException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("vehicleId", "is retired"));
+  }
+
+  /** BR20. Whether the account exists is not said. */
+  @ExceptionHandler(NotAFieldTechnicianException.class)
+  ProblemDetail notAFieldTechnician(NotAFieldTechnicianException e) {
+    return problem(
+        HttpStatus.BAD_REQUEST,
+        INVALID_FIELDS,
+        Map.of("technicianId", "is not an active field technician"));
+  }
+
+  /** The ticket's state no longer allows the change (e.g. the work has started). */
+  @ExceptionHandler(ForbiddenTicketTransitionException.class)
+  ProblemDetail ticketTransitionRefused(ForbiddenTicketTransitionException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("state", e.getMessage()));
   }
 }
