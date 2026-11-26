@@ -59,6 +59,11 @@ public class MqttTelemetryConnection implements SmartLifecycle {
     return subscriber;
   }
 
+  /** The connection's client, so commands to vehicles share it with telemetry (US04). */
+  public Mqtt5AsyncClient client() {
+    return client;
+  }
+
   private void onConnected() {
     LOG.info("Connected to the MQTT broker at {}", broker);
     subscriber.subscribe();

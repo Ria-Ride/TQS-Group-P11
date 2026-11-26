@@ -84,7 +84,8 @@ class MqttVehicleCommandPublisherIT {
         commands
             .receive(5, TimeUnit.SECONDS)
             .orElseThrow(() -> new AssertionError("No command reached the simulator"));
-    assertThat(received.getTopic()).hasToString("fleet/fleet-01/vehicles/bike-0001/commands/unlock");
+    assertThat(received.getTopic())
+        .hasToString("fleet/fleet-01/vehicles/bike-0001/commands/unlock");
     assertThat(received.getQos()).isEqualTo(MqttQos.AT_LEAST_ONCE);
     assertThat(received.isRetain()).isFalse();
     assertThat(new String(received.getPayloadAsBytes(), StandardCharsets.UTF_8))

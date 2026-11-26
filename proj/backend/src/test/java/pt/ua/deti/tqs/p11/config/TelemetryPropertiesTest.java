@@ -2,11 +2,11 @@ package pt.ua.deti.tqs.p11.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
-import java.time.Duration;
 
 /**
  * The MQTT settings of the telemetry adapter (app.telemetry.*): off by default, simulator's names,
@@ -17,7 +17,9 @@ class TelemetryPropertiesTest {
   private static TelemetryProperties bind(Map<String, String> properties) {
     return new Binder(new MapConfigurationPropertySource(properties))
         .bind("app.telemetry", TelemetryProperties.class)
-        .orElseGet(() -> new TelemetryProperties(false, "localhost", 1883, "", "", "", "fleet-01", Duration.ofSeconds(30)));
+        .orElseGet(() ->
+            new TelemetryProperties(
+                false, "localhost", 1883, "", "", "", "fleet-01", Duration.ofSeconds(30)));
   }
 
   @Test
@@ -51,7 +53,13 @@ class TelemetryPropertiesTest {
     assertThat(properties)
         .isEqualTo(
             new TelemetryProperties(
-                true, "broker", 1884, "platform", "secret", "platform-1", "fleet-02",
+                true,
+                "broker",
+                1884,
+                "platform",
+                "secret",
+                "platform-1",
+                "fleet-02",
                 Duration.ofSeconds(10)));
   }
 }

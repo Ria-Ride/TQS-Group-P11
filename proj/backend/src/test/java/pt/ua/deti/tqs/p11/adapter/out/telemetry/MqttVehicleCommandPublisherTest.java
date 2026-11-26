@@ -61,8 +61,8 @@ class MqttVehicleCommandPublisherTest {
     Clock clock = Clock.systemUTC();
     Duration ttl = Duration.ofSeconds(30);
 
-    assertThatThrownBy(
-            () -> new MqttVehicleCommandPublisher(OFFLINE, "fleet/01", ttl, clock, UUID::randomUUID))
+    assertThatThrownBy(() ->
+            new MqttVehicleCommandPublisher(OFFLINE, "fleet/01", ttl, clock, UUID::randomUUID))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -71,10 +71,9 @@ class MqttVehicleCommandPublisherTest {
   void new_ttlThatIsNotPositive_isRefused() {
     Clock clock = Clock.systemUTC();
 
-    assertThatThrownBy(
-            () ->
-                new MqttVehicleCommandPublisher(
-                    OFFLINE, "fleet-01", Duration.ZERO, clock, UUID::randomUUID))
+    assertThatThrownBy(() ->
+            new MqttVehicleCommandPublisher(
+                OFFLINE, "fleet-01", Duration.ZERO, clock, UUID::randomUUID))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }
