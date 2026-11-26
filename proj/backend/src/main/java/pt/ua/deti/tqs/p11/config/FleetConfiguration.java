@@ -2,7 +2,6 @@ package pt.ua.deti.tqs.p11.config;
 
 import java.time.Clock;
 import java.util.UUID;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -16,10 +15,10 @@ import pt.ua.deti.tqs.p11.application.fleet.VehicleLifecycleUseCase;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleSearchUseCase;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleStateChangeRepository;
+import pt.ua.deti.tqs.p11.application.rules.RulesOfUseUseCase;
 
 /** Wires the fleet use cases (US08) to their adapters (ports and adapters). */
 @Configuration
-@EnableConfigurationProperties(FleetProperties.class)
 class FleetConfiguration {
 
   @Bean
@@ -47,7 +46,9 @@ class FleetConfiguration {
 
   @Bean
   VehicleSearchUseCase vehicleSearchUseCase(
-      HubRepository hubs, VehicleRepository vehicles, FleetProperties properties) {
-    return new VehicleSearchUseCase(hubs, vehicles, properties.toRule());
+      HubRepository hubs, VehicleRepository vehicles, RulesOfUseUseCase rules) {
+    // The battery rule is read from the rules of use at every search, so a change by the client
+    // manager (US14) reaches the next search.
+    return new VehicleSearchUseCase(hubs, vehicles, () -> rules.current().batteryRule());
   }
 }

@@ -8,10 +8,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.UUID;
 import pt.ua.deti.tqs.p11.domain.pass.Stay;
 
-/** JPA mapping of stays. Only redeemed_by changes here; stays are created by US14. */
+/** JPA mapping of stays. After creation (US14), only redeemed_by changes (US03). */
 @Entity
 @Table(name = "stays")
 class StayJpaEntity {
@@ -37,6 +38,17 @@ class StayJpaEntity {
 
   /** For JPA only. */
   protected StayJpaEntity() {}
+
+  static StayJpaEntity from(Stay stay, PartnerAccommodationJpaEntity accommodation) {
+    StayJpaEntity entity = new StayJpaEntity();
+    entity.id = stay.id();
+    entity.code = stay.code().toUpperCase(Locale.ROOT);
+    entity.accommodation = accommodation;
+    entity.checkIn = stay.checkIn();
+    entity.checkOut = stay.checkOut();
+    entity.redeemedBy = stay.redeemedBy().orElse(null);
+    return entity;
+  }
 
   Stay toDomain() {
     return new Stay(id, code, accommodation.toDomain(), checkIn, checkOut, redeemedBy);

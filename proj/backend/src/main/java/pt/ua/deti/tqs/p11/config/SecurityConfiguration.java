@@ -98,9 +98,15 @@ class SecurityConfiguration {
                 .requestMatchers(HttpMethod.PATCH, "/hubs/{id}")
                 .hasAnyRole(OPERATOR, CLIENT_MANAGER, ADMIN)
                 // Client management and KPIs (US14, US15).
-                .requestMatchers(HttpMethod.GET, "/stay-codes", "/kpis")
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/stay-codes",
+                    "/partner-accommodations",
+                    "/usage-rules/versions",
+                    "/kpis")
                 .hasAnyRole(CLIENT_MANAGER, ADMIN)
-                .requestMatchers(HttpMethod.POST, "/pass-types", "/stay-codes")
+                .requestMatchers(
+                    HttpMethod.POST, "/pass-types", "/stay-codes", "/partner-accommodations")
                 .hasAnyRole(CLIENT_MANAGER, ADMIN)
                 .requestMatchers(HttpMethod.PATCH, "/vehicle-types/{type}", "/pass-types/{id}")
                 .hasAnyRole(CLIENT_MANAGER, ADMIN)
