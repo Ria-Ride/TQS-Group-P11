@@ -1,4 +1,4 @@
-const NOT_IMPLEMENTED = "Not implemented yet (KAN-719)";
+import { requestJson } from "./client";
 
 export type TicketState = "OPEN" | "ASSIGNED" | "IN_PROGRESS" | "CLOSED" | "CANCELLED";
 
@@ -31,22 +31,29 @@ export interface Technician {
   name: string;
 }
 
-export function listOpenTickets(_token: string): Promise<Ticket[]> {
-  throw new Error(NOT_IMPLEMENTED);
+/** US10: open tickets, nearest SLA deadline first, for operators (the API answers 403 to others). */
+export function listOpenTickets(token: string): Promise<Ticket[]> {
+  return requestJson<Ticket[]>("/tickets", { token });
 }
 
-export function openTicket(_input: NewTicket, _token: string): Promise<Ticket> {
-  throw new Error(NOT_IMPLEMENTED);
+/** BR20: refused (409 on faultCode) when the fault already has an open ticket. */
+export function openTicket(input: NewTicket, token: string): Promise<Ticket> {
+  return requestJson<Ticket>("/tickets", { method: "POST", body: input, token });
 }
 
+/** BR20: refused (400 on technicianId) for anyone but an active field technician. */
 export function assignTicket(
-  _ticketId: string,
-  _technicianId: string,
-  _token: string,
+  ticketId: string,
+  technicianId: string,
+  token: string,
 ): Promise<Ticket> {
-  throw new Error(NOT_IMPLEMENTED);
+  return requestJson<Ticket>(`/tickets/${encodeURIComponent(ticketId)}/assignee`, {
+    method: "PATCH",
+    body: { technicianId },
+    token,
+  });
 }
 
-export function listTechnicians(_token: string): Promise<Technician[]> {
-  throw new Error(NOT_IMPLEMENTED);
+export function listTechnicians(token: string): Promise<Technician[]> {
+  return requestJson<Technician[]>("/technicians", { token });
 }

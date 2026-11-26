@@ -171,7 +171,8 @@ describe("tickets page", () => {
     expect(assigned.getByText("Front basket cracked")).toBeInTheDocument();
     expect(assigned.getByText("Operator")).toBeInTheDocument();
     expect(assigned.getByText("Assigned")).toBeInTheDocument();
-    expect(assigned.getByText("Tiago Lopes")).toBeInTheDocument();
+    // The name is also a choice of the technician select, so look for its cell.
+    expect(assigned.getByRole("cell", { name: "Tiago Lopes" })).toBeInTheDocument();
     expect(
       assigned.getByText(new Date(basket.slaDeadline).toLocaleString()),
     ).toBeInTheDocument();
