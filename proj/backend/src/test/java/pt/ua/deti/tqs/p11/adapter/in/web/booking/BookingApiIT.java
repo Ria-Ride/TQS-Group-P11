@@ -4,11 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,15 +35,6 @@ import pt.ua.deti.tqs.p11.support.ApiClient;
 import pt.ua.deti.tqs.p11.support.ApiClient.Registered;
 import pt.ua.deti.tqs.p11.support.FleetApi;
 import pt.ua.deti.tqs.p11.support.PaymentGatewayContainer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.RepeatedTest;
 
 /**
  * POST /bookings for an immediate start (US04) over HTTP, with a real database and the simulated
@@ -266,7 +266,6 @@ class BookingApiIT {
     assertThat(start(operatorToken, body).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
   }
 
-
   private static final String RIDERS = "'rider%.bookingapi@example.com'";
 
   private List<Registered> ridersWithADayPass(int count) {
@@ -329,13 +328,13 @@ class BookingApiIT {
         .allSatisfy(a -> assertThat(FleetApi.errors(a)).containsKey("vehicleId"))
         .hasSize(tourists - 1);
     assertThat(
-            count(
-                "SELECT COUNT(*) FROM bookings WHERE vehicle_id = ? AND state = 'ACTIVE'", bike))
+            count("SELECT COUNT(*) FROM bookings WHERE vehicle_id = ? AND state = 'ACTIVE'", bike))
         .isEqualTo(1);
     assertThat(
             count(
                 "SELECT COUNT(*) FROM payments p JOIN users u ON u.id = p.account_id"
-                    + " WHERE u.email LIKE " + RIDERS
+                    + " WHERE u.email LIKE "
+                    + RIDERS
                     + " AND p.kind = 'DEPOSIT' AND p.state = 'AUTHORIZED'"))
         .as("only the winner keeps a held deposit")
         .isEqualTo(1);

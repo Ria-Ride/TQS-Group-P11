@@ -19,11 +19,11 @@ import pt.ua.deti.tqs.p11.TestcontainersConfiguration;
 import pt.ua.deti.tqs.p11.application.booking.BookingRepository;
 import pt.ua.deti.tqs.p11.domain.billing.Money;
 import pt.ua.deti.tqs.p11.domain.booking.Booking;
+import pt.ua.deti.tqs.p11.domain.booking.BookingRefusal;
+import pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException;
 import pt.ua.deti.tqs.p11.domain.booking.BookingRules;
 import pt.ua.deti.tqs.p11.domain.booking.BookingState;
 import pt.ua.deti.tqs.p11.domain.booking.BookingTerms;
-import pt.ua.deti.tqs.p11.domain.booking.BookingRefusal;
-import pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException;
 
 /** Bookings and the rules they keep (BR21), against a real PostgreSQL. */
 @SpringBootTest
