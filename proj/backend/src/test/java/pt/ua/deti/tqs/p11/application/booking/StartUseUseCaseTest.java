@@ -63,8 +63,8 @@ import pt.ua.deti.tqs.p11.domain.user.User;
  * Starting an immediate use (US04). Which requests the rules accept is tested in BookingPolicyTest;
  * here, the order of the steps and what each failure leaves behind: the rules are checked before
  * any money is held, the deposit is held before any state change (BR11), the booking and the
- * vehicle change together on the locked rows (BR3, BR6), and the vehicle is unlocked only after
- * the booking is stored. The fleet use case is the real one, on mocked repositories.
+ * vehicle change together on the locked rows (BR3, BR6), and the vehicle is unlocked only after the
+ * booking is stored. The fleet use case is the real one, on mocked repositories.
  */
 @ExtendWith(MockitoExtension.class)
 class StartUseUseCaseTest {
@@ -88,8 +88,7 @@ class StartUseUseCaseTest {
           Duration.ofMinutes(15),
           Money.of("2.00"));
   private static final BatteryRule BATTERY =
-      new BatteryRule(
-          BatteryLevel.of(20), Map.of(VehicleType.E_BIKE, 5, VehicleType.E_SCOOTER, 5));
+      new BatteryRule(BatteryLevel.of(20), Map.of(VehicleType.E_BIKE, 5, VehicleType.E_SCOOTER, 5));
   private static final PassCoverage DAY_PASS =
       new PassCoverage(
           PASS_ID,
@@ -136,7 +135,8 @@ class StartUseUseCaseTest {
   // ------------------------------------------------------------- fixtures
 
   private static Vehicle available(VehicleType type) {
-    return new Vehicle(BIKE_ID, BIKE_CODE, type, VehicleState.AVAILABLE, HUB_ID, BatteryLevel.of(100));
+    return new Vehicle(
+        BIKE_ID, BIKE_CODE, type, VehicleState.AVAILABLE, HUB_ID, BatteryLevel.of(100));
   }
 
   private static StartUseCommand rideFor(int minutes) {
@@ -191,8 +191,7 @@ class StartUseUseCaseTest {
 
     verify(vehicles).save(argThat(saved -> saved.state() == VehicleState.IN_USE));
     verify(history)
-        .save(
-            new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.IN_USE, NOW));
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.IN_USE, NOW));
   }
 
   /** BR11: the deposit of the vehicle's type, on the tourist's card, with our payment id. */
@@ -293,8 +292,7 @@ class StartUseUseCaseTest {
 
     assertThatThrownBy(() -> useCase.start(ride))
         .isInstanceOfSatisfying(
-            DepositDeclinedException.class,
-            e -> assertThat(e.reason()).isEqualTo("card_declined"));
+            DepositDeclinedException.class, e -> assertThat(e.reason()).isEqualTo("card_declined"));
     verify(payments)
         .save(Payment.depositDeclined(PAYMENT_ID, ANA, Money.of("30.00"), "card_declined", NOW));
     verify(vehicles, never()).save(any());
@@ -332,7 +330,12 @@ class StartUseUseCaseTest {
     givenTheRequestIsRead(available(VehicleType.E_BIKE));
     Vehicle taken =
         new Vehicle(
-            BIKE_ID, BIKE_CODE, VehicleType.E_BIKE, VehicleState.IN_USE, null, BatteryLevel.of(100));
+            BIKE_ID,
+            BIKE_CODE,
+            VehicleType.E_BIKE,
+            VehicleState.IN_USE,
+            null,
+            BatteryLevel.of(100));
     givenTheRowsAreLocked(taken);
     StartUseCommand ride = rideFor(60);
 
@@ -374,15 +377,20 @@ class StartUseUseCaseTest {
   }
 
   /**
-   * A release that does not go through is not recorded as one (the money may still be held, and
-   * it is logged); the tourist still gets the real reason.
+   * A release that does not go through is not recorded as one (the money may still be held, and it
+   * is logged); the tourist still gets the real reason.
    */
   @Test
   void start_releaseFailsAfterLosing_stillReportsTheRefusalAndRecordsNoRelease() {
     givenTheRequestIsRead(available(VehicleType.E_BIKE));
     Vehicle taken =
         new Vehicle(
-            BIKE_ID, BIKE_CODE, VehicleType.E_BIKE, VehicleState.IN_USE, null, BatteryLevel.of(100));
+            BIKE_ID,
+            BIKE_CODE,
+            VehicleType.E_BIKE,
+            VehicleState.IN_USE,
+            null,
+            BatteryLevel.of(100));
     givenTheRowsAreLocked(taken);
     gateway.answeringReleases(new DepositResult.TimedOut());
     StartUseCommand ride = rideFor(60);

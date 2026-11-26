@@ -27,7 +27,12 @@ class PassesAsCoverageTest {
   private static final Instant FROM = Instant.parse("2026-11-26T09:00:00Z");
   private static final PassType BIKES =
       new PassType(
-          UUID.randomUUID(), "BIKE_DAY", "Bike day", 1, Money.of("8.00"), Set.of(VehicleType.E_BIKE));
+          UUID.randomUUID(),
+          "BIKE_DAY",
+          "Bike day",
+          1,
+          Money.of("8.00"),
+          Set.of(VehicleType.E_BIKE));
   private static final PassType ALL =
       new PassType(
           UUID.randomUUID(),
