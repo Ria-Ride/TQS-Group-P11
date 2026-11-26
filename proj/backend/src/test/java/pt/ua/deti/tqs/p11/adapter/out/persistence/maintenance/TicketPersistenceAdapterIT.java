@@ -265,6 +265,23 @@ class TicketPersistenceAdapterIT {
     assertThat(tickets.findOpenFor(UUID.randomUUID(), BRAKE_WEAR)).isEmpty();
   }
 
+  /** BR19: the operator sees the most urgent ticket first; finished ones are not listed. */
+  @Test
+  void findOpen_listsOnlyOpenTicketsByDeadline() {
+    MaintenanceTicket later = fromFault(BRAKE_WEAR);
+    MaintenanceTicket sooner =
+        MaintenanceTicket.openFromFault(
+                UUID.randomUUID(), VEHICLE_ID, LOW_TYRE_PRESSURE, OPENED_AT.minusSeconds(3600), SLA)
+            .assignTo(technician());
+    tickets.save(later);
+    tickets.save(sooner);
+    tickets.save(finished(TicketState.CLOSED, FaultCode.of("FLAT_TYRE")));
+
+    assertThat(tickets.findOpen())
+        .filteredOn(ticket -> ticket.vehicleId().equals(VEHICLE_ID))
+        .containsExactly(sooner, later);
+  }
+
   @Test
   void existsOpenFor_vehicleWithAnAssignedTicket_isTrue() {
     tickets.save(fromFault(BRAKE_WEAR).assignTo(technician()));

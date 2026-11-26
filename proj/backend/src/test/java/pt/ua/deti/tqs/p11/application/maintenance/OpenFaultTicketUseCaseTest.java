@@ -1,6 +1,7 @@
 package pt.ua.deti.tqs.p11.application.maintenance;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -48,6 +49,7 @@ class OpenFaultTicketUseCaseTest {
   private static final FaultCode BRAKE_WEAR = FaultCode.of("BRAKE_WEAR");
   private static final Instant NOW = Instant.parse("2026-11-10T10:00:05Z");
   private static final Duration SLA = Duration.ofHours(24);
+  private static final UUID OPERATOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000201");
 
   @Mock private TicketRepository tickets;
   @Mock private VehicleRepository vehicles;
@@ -173,6 +175,72 @@ class OpenFaultTicketUseCaseTest {
   void faultReported_retiredVehicle_isIgnored() {
     useCase.faultReported(bikeIn(VehicleState.RETIRED), BRAKE_WEAR);
 
+    verifyNoInteractions(tickets, vehicles, history, bookings);
+  }
+
+  // ------------------------------------------------------------- manual tickets
+
+  private MaintenanceTicket openManually(VehicleState state) {
+    return useCase.openManually(bikeIn(state), BRAKE_WEAR, "Brakes squeak", OPERATOR_ID);
+  }
+
+  /** BR19: same deadline rule as a reading; the operator and what they saw are kept. */
+  @Test
+  void openManually_availableVehicle_opensTheOperatorsTicketAndGoesToMaintenance() {
+    MaintenanceTicket returned = openManually(VehicleState.AVAILABLE);
+
+    MaintenanceTicket ticket = savedTicket();
+    assertThat(returned).isEqualTo(ticket);
+    assertThat(ticket.id()).isEqualTo(TICKET_ID);
+    assertThat(ticket.openedByOperator()).contains(OPERATOR_ID);
+    assertThat(ticket.description()).isEqualTo("Brakes squeak");
+    assertThat(ticket.openedAt()).isEqualTo(NOW);
+    assertThat(ticket.slaDeadline()).isEqualTo(Instant.parse("2026-11-11T10:00:05Z"));
+    verify(history)
+        .save(
+            new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.MAINTENANCE, NOW));
+  }
+
+  @Test
+  void openManually_reservedVehicle_cancelsItsBooking() {
+    openManually(VehicleState.RESERVED);
+
+    verify(bookings).cancelReservedBookingOf(BIKE_ID);
+  }
+
+  @Test
+  void openManually_vehicleInUse_opensTheTicketWithoutStoppingTheRide() {
+    openManually(VehicleState.IN_USE);
+
+    assertThat(savedTicket().vehicleId()).isEqualTo(BIKE_ID);
+    verifyNoInteractions(vehicles, history, bookings);
+  }
+
+  /** BR20: refused, and the operator is told which ticket already covers the fault. */
+  @Test
+  void openManually_faultAlreadyCovered_isRefusedWithTheOpenTicket() {
+    MaintenanceTicket open =
+        MaintenanceTicket.openFromFault(
+            UUID.randomUUID(), BIKE_ID, BRAKE_WEAR, NOW.minusSeconds(60), SLA);
+    when(tickets.findOpenFor(BIKE_ID, BRAKE_WEAR)).thenReturn(Optional.of(open));
+    Vehicle maintenance = bikeIn(VehicleState.MAINTENANCE);
+
+    assertThatThrownBy(
+            () -> useCase.openManually(maintenance, BRAKE_WEAR, "Brakes squeak", OPERATOR_ID))
+        .isInstanceOfSatisfying(
+            FaultAlreadyCoveredException.class,
+            e -> assertThat(e.existingTicketId()).contains(open.id()));
+    verify(tickets, never()).save(any());
+    verifyNoInteractions(vehicles, history, bookings);
+  }
+
+  @Test
+  void openManually_retiredVehicle_isRefused() {
+    Vehicle retired = bikeIn(VehicleState.RETIRED);
+
+    assertThatThrownBy(
+            () -> useCase.openManually(retired, BRAKE_WEAR, "Brakes squeak", OPERATOR_ID))
+        .isInstanceOf(VehicleRetiredException.class);
     verifyNoInteractions(tickets, vehicles, history, bookings);
   }
 }

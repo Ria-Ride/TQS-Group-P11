@@ -56,6 +56,11 @@ class TicketPersistenceAdapter implements TicketRepository {
   }
 
   @Override
+  public List<MaintenanceTicket> findOpen() {
+    throw new UnsupportedOperationException("US10");
+  }
+
+  @Override
   public boolean existsOpenFor(UUID vehicleId) {
     return repository.existsByVehicleIdAndStateIn(vehicleId, OPEN_STATES);
   }

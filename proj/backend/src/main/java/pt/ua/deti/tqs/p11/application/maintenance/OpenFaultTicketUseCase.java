@@ -18,11 +18,12 @@ import pt.ua.deti.tqs.p11.domain.maintenance.FaultCode;
 import pt.ua.deti.tqs.p11.domain.maintenance.MaintenanceTicket;
 
 /**
- * Opens a maintenance ticket when a reading reports a fault (US10). BR20: a fault that already has
- * an open ticket opens no other. BR18: an Available or Reserved vehicle goes to Maintenance (a
- * Reserved one also loses its booking), an InUse ride is not interrupted, and any other vehicle
- * keeps its state. BR19: the ticket is due its opening time plus the SLA. A Retired vehicle is out
- * of the fleet for good, so its faults are ignored.
+ * Opens maintenance tickets for faults (US10): reported by telemetry, or by an operator for a fault
+ * the simulator cannot detect. Both come with the vehicle already locked, inside a transaction.
+ * BR20: a fault that already has an open ticket opens no other. BR18: an Available or Reserved
+ * vehicle goes to Maintenance (a Reserved one also loses its booking), an InUse ride is not
+ * interrupted, and any other vehicle keeps its state. BR19: the ticket is due its opening time plus
+ * the SLA. A Retired vehicle is out of the fleet for good, so its faults are ignored.
  */
 public class OpenFaultTicketUseCase implements FaultReportListener {
 
@@ -72,5 +73,17 @@ public class OpenFaultTicketUseCase implements FaultReportListener {
     if (vehicle.state() == VehicleState.RESERVED) {
       bookings.cancelReservedBookingOf(vehicle.id());
     }
+  }
+
+  /**
+   * An operator's ticket for the locked vehicle (BR18, BR19), with the same effect on the vehicle
+   * as a fault reading.
+   *
+   * @throws FaultAlreadyCoveredException with the open ticket, if the fault is covered (BR20)
+   * @throws VehicleRetiredException if the vehicle is out of the fleet for good
+   */
+  public MaintenanceTicket openManually(
+      Vehicle vehicle, FaultCode fault, String description, UUID operatorId) {
+    throw new UnsupportedOperationException("US10");
   }
 }
