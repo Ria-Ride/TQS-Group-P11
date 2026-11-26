@@ -41,6 +41,7 @@ POST,/bookings/{id}/cancel,N,OWN,N,N,Y
 GET,/tickets,N,N,Y,N,Y
 POST,/tickets,N,N,Y,N,Y
 PATCH,/tickets/{id}/assignee,N,N,Y,N,Y
+GET,/technicians,N,N,Y,N,Y
 POST,/tickets/{id}/close,N,N,Y,N,Y
 GET,/fleet/overview,N,N,Y,N,Y
 GET,/kpis,N,N,N,Y,Y
