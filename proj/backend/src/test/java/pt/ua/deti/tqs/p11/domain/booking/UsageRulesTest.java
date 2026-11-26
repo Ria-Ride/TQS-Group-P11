@@ -69,8 +69,7 @@ class UsageRulesTest {
   void new_zeroOvertimeBlock_isRefused() {
     Duration max = Duration.ofHours(4);
 
-    assertThatThrownBy(
-            () -> new UsageRules(max, DEPOSITS, WINDOW, GRACE, Duration.ZERO, PRICE))
+    assertThatThrownBy(() -> new UsageRules(max, DEPOSITS, WINDOW, GRACE, Duration.ZERO, PRICE))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

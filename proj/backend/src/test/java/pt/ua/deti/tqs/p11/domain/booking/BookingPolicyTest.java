@@ -42,10 +42,10 @@ class BookingPolicyTest {
           Duration.ofMinutes(10),
           Duration.ofMinutes(15),
           Money.of("2.00"));
+
   /** BR1: a 20% floor plus 5% per started 30 minutes, for both types. */
   private static final BatteryRule BATTERY =
-      new BatteryRule(
-          BatteryLevel.of(20), Map.of(VehicleType.E_BIKE, 5, VehicleType.E_SCOOTER, 5));
+      new BatteryRule(BatteryLevel.of(20), Map.of(VehicleType.E_BIKE, 5, VehicleType.E_SCOOTER, 5));
 
   private final BookingPolicy policy = new BookingPolicy(RULES, BATTERY);
 
@@ -265,8 +265,7 @@ class BookingPolicyTest {
   @Test
   void check_severalPassesCoverTheRide_takesTheOneThatEndsLast() {
     PassCoverage day = pass(NOW.minus(Duration.ofHours(1)), in(60 * 23), VehicleType.E_BIKE);
-    PassCoverage multiDay =
-        pass(NOW.minus(Duration.ofHours(1)), in(60 * 71), VehicleType.E_BIKE);
+    PassCoverage multiDay = pass(NOW.minus(Duration.ofHours(1)), in(60 * 71), VehicleType.E_BIKE);
 
     assertThat(policy.check(bike(), NOW, in(60), List.of(day, multiDay), List.of()))
         .isEqualTo(multiDay);

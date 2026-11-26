@@ -37,15 +37,14 @@ class BookingPropertiesTest {
   @Test
   void everyValue_isReadFromTheProperties() {
     UsageRules rules =
-        bind(
-                Map.of(
-                    "app.booking.max-duration", "PT2H",
-                    "app.booking.deposit.e-bike", "25.00",
-                    "app.booking.deposit.e-scooter", "45.50",
-                    "app.booking.start-window", "PT20M",
-                    "app.booking.overtime-grace", "PT5M",
-                    "app.booking.overtime-block", "PT30M",
-                    "app.booking.overtime-price-per-block", "3.50"))
+        bind(Map.of(
+                "app.booking.max-duration", "PT2H",
+                "app.booking.deposit.e-bike", "25.00",
+                "app.booking.deposit.e-scooter", "45.50",
+                "app.booking.start-window", "PT20M",
+                "app.booking.overtime-grace", "PT5M",
+                "app.booking.overtime-block", "PT30M",
+                "app.booking.overtime-price-per-block", "3.50"))
             .toRules();
 
     assertThat(rules.maxBookingDuration()).isEqualTo(Duration.ofHours(2));
