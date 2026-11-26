@@ -3,10 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
 import { listHubs, searchHubVehicles, type Hub, type HubVehicle } from "../api/fleet";
+import {
+  listVehicleTypes,
+  startRide,
+  type Booking,
+  type VehicleTypeDeposit,
+} from "../api/bookings";
 import { loadSession, saveSession } from "../auth/session";
 import { renderApp } from "../test/renderApp";
 
 vi.mock("../api/fleet");
+vi.mock("../api/bookings");
 
 const TOKEN = "token-for-ana";
 const USER_ID = "4b1d6f2e-8a3c-4e5b-9d7f-1a2b3c4d5e6f";
@@ -45,6 +52,27 @@ function found(code: string, overrides: Partial<HubVehicle> = {}): HubVehicle {
   };
 }
 
+const DEPOSITS: VehicleTypeDeposit[] = [
+  { type: "E_BIKE", deposit: "30.00", currency: "EUR" },
+  { type: "E_SCOOTER", deposit: "50.00", currency: "EUR" },
+];
+
+function started(overrides: Partial<Booking> = {}): Booking {
+  return {
+    id: "booking-1",
+    state: "ACTIVE",
+    vehicleId: "id-bike-0001",
+    passId: "pass-1",
+    startHubId: hub03.id,
+    plannedStart: "2026-11-26T10:00:00Z",
+    plannedEnd: "2026-11-26T11:00:00Z",
+    startedAt: "2026-11-26T10:00:00Z",
+    deposit: "30.00",
+    currency: "EUR",
+    ...overrides,
+  };
+}
+
 function openSearch(hubs: Hub[] = [hub03, hub05], vehicles: HubVehicle[] = []) {
   saveSession({ userId: USER_ID, accessToken: TOKEN });
   vi.mocked(listHubs).mockResolvedValue(hubs);
@@ -62,6 +90,9 @@ async function row(code: string) {
 beforeEach(() => {
   vi.mocked(listHubs).mockReset();
   vi.mocked(searchHubVehicles).mockReset();
+  // Every search page reads the deposits when it opens.
+  vi.mocked(listVehicleTypes).mockReset().mockResolvedValue(DEPOSITS);
+  vi.mocked(startRide).mockReset();
   sessionStorage.clear();
 });
 
@@ -363,5 +394,185 @@ describe("vehicle search page", () => {
 
     expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
     expect(loadSession()).toBeNull();
+  });
+});
+
+// ------------------------------------------------------------- starting a ride (US04)
+
+const startPanel = () => screen.findByRole("region", { name: "Start a ride" });
+
+async function selectVehicle(code: string) {
+  const user = userEvent.setup();
+  await user.click((await row(code)).getByRole("button", { name: "Select" }));
+  return user;
+}
+
+describe("starting a ride from the search (US04)", () => {
+  it("shows the deposit of the selected vehicle's type before the tourist confirms", async () => {
+    openSearch([hub03], [found("bike-0001"), found("scooter-0001", { type: "E_SCOOTER" })]);
+
+    const user = await selectVehicle("bike-0001");
+    expect(
+      within(await startPanel()).getByText("Deposit held during the ride: 30.00 EUR"),
+    ).toBeInTheDocument();
+
+    await user.click((await row("scooter-0001")).getByRole("button", { name: "Select" }));
+    expect(
+      within(await startPanel()).getByText("Deposit held during the ride: 50.00 EUR"),
+    ).toBeInTheDocument();
+    expect(startRide).not.toHaveBeenCalled();
+  });
+
+  it("offers rides of up to 4 hours, one hour by default", async () => {
+    openSearch([hub03], [found("bike-0001")]);
+    await selectVehicle("bike-0001");
+
+    const duration = within(await startPanel()).getByLabelText("Ride duration");
+    expect(within(duration).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "30 minutes",
+      "1 hour",
+      "2 hours",
+      "3 hours",
+      "4 hours",
+    ]);
+    expect(duration).toHaveValue("60");
+  });
+
+  it("starts with the ride length chosen in the search", async () => {
+    openSearch([hub03], [found("bike-0001")]);
+    const user = userEvent.setup();
+    await user.selectOptions(await screen.findByLabelText("Ride length"), "120");
+    await waitFor(() =>
+      expect(searchHubVehicles).toHaveBeenLastCalledWith(
+        hub03.id,
+        { type: null, minutes: 120 },
+        TOKEN,
+      ),
+    );
+
+    await user.click((await row("bike-0001")).getByRole("button", { name: "Select" }));
+
+    expect(within(await startPanel()).getByLabelText("Ride duration")).toHaveValue("120");
+  });
+
+  it("starts the ride with the vehicle, the planned end and the chosen test card", async () => {
+    openSearch([hub03], [found("bike-0001")]);
+    vi.mocked(startRide).mockResolvedValue(started());
+    const user = await selectVehicle("bike-0001");
+    const panel = within(await startPanel());
+    await user.selectOptions(panel.getByLabelText("Ride duration"), "120");
+    await user.click(panel.getByRole("radio", { name: "Payment declined" }));
+    const before = Date.now();
+
+    await user.click(panel.getByRole("button", { name: "Start ride" }));
+
+    await waitFor(() => expect(startRide).toHaveBeenCalledOnce());
+    const [ride, token] = vi.mocked(startRide).mock.calls[0];
+    expect(token).toBe(TOKEN);
+    expect(ride.vehicleId).toBe("id-bike-0001");
+    expect(ride.paymentToken).toBe("tok_decline");
+    const minutes = (Date.parse(ride.plannedEnd) - before) / 60_000;
+    expect(minutes).toBeGreaterThanOrEqual(120);
+    expect(minutes).toBeLessThan(121);
+  });
+
+  it("shows the ride once it has started", async () => {
+    openSearch([hub03], [found("bike-0001")]);
+    vi.mocked(startRide).mockResolvedValue(started());
+    const user = await selectVehicle("bike-0001");
+
+    await user.click(within(await startPanel()).getByRole("button", { name: "Start ride" }));
+
+    const ride = within(await screen.findByRole("region", { name: "Your ride has started" }));
+    expect(ride.getByText("bike-0001")).toBeInTheDocument();
+    expect(ride.getByText("hub-03 · Canal Central")).toBeInTheDocument();
+    expect(ride.getByText("30.00 EUR")).toBeInTheDocument();
+    expect(ride.getByText("The vehicle is being unlocked.")).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      409,
+      { vehicleId: "is not available" },
+      "This vehicle was just taken or cannot do this ride. Choose another one.",
+    ],
+    [
+      409,
+      { booking: "you already have a booking in that period" },
+      "You already have a ride in progress.",
+    ],
+    [
+      400,
+      { plannedEnd: "is after the end of your pass" },
+      "This ride is too long for the rules or for your pass. Choose a shorter one.",
+    ],
+    [
+      402,
+      { deposit: "was declined" },
+      "Your deposit was declined. No ride was started and nothing was held.",
+    ],
+    [
+      504,
+      { deposit: "got no answer in time; try again" },
+      "The deposit did not answer in time. No ride was started; please try again.",
+    ],
+  ])("explains a refusal (%i %o) in words for tourists", async (status, errors, message) => {
+    openSearch([hub03], [found("bike-0001")]);
+    vi.mocked(startRide).mockRejectedValue(new ApiError(status, errors));
+    const user = await selectVehicle("bike-0001");
+
+    await user.click(within(await startPanel()).getByRole("button", { name: "Start ride" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  });
+
+  it("offers to buy a pass when the tourist has no valid one", async () => {
+    openSearch([hub03], [found("bike-0001")]);
+    vi.mocked(startRide).mockRejectedValue(new ApiError(409, { pass: "you have no valid pass" }));
+    const user = await selectVehicle("bike-0001");
+
+    await user.click(within(await startPanel()).getByRole("button", { name: "Start ride" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "You need a valid pass that allows this vehicle type.",
+    );
+    expect(screen.getByRole("link", { name: "Buy a pass" })).toHaveAttribute("href", "/passes/buy");
+  });
+
+  it("searches the hub again when the vehicle was just taken", async () => {
+    openSearch([hub03], [found("bike-0001")]);
+    vi.mocked(startRide).mockRejectedValue(new ApiError(409, { vehicleId: "is not available" }));
+    const user = await selectVehicle("bike-0001");
+    const searchesBefore = vi.mocked(searchHubVehicles).mock.calls.length;
+
+    await user.click(within(await startPanel()).getByRole("button", { name: "Start ride" }));
+
+    await waitFor(() =>
+      expect(vi.mocked(searchHubVehicles).mock.calls.length).toBeGreaterThan(searchesBefore),
+    );
+  });
+
+  it("asks to log in again when the token is refused while starting", async () => {
+    openSearch([hub03], [found("bike-0001")]);
+    vi.mocked(startRide).mockRejectedValue(new ApiError(401, {}));
+    const user = await selectVehicle("bike-0001");
+
+    await user.click(within(await startPanel()).getByRole("button", { name: "Start ride" }));
+
+    expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
+    expect(loadSession()).toBeNull();
+  });
+
+  it("does not offer to start while the deposits are unknown", async () => {
+    // Set after the beforeEach default; openSearch does not change it.
+    vi.mocked(listVehicleTypes).mockRejectedValue(new ApiError(500, {}));
+    openSearch([hub03], [found("bike-0001")]);
+    await selectVehicle("bike-0001");
+
+    const panel = within(await startPanel());
+    expect(
+      panel.getByText("The deposit cannot be shown right now. Please try again later."),
+    ).toBeInTheDocument();
+    expect(panel.getByRole("button", { name: "Start ride" })).toBeDisabled();
   });
 });
