@@ -8,6 +8,7 @@ import pt.ua.deti.tqs.p11.adapter.in.telemetry.MqttTelemetryConnection;
 import pt.ua.deti.tqs.p11.adapter.in.telemetry.MqttTelemetrySubscriber;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
+import pt.ua.deti.tqs.p11.application.telemetry.FaultReportListener;
 import pt.ua.deti.tqs.p11.application.telemetry.TelemetryIngestionPort;
 import pt.ua.deti.tqs.p11.application.telemetry.TelemetryIngestionUseCase;
 
@@ -21,8 +22,8 @@ class TelemetryConfiguration {
 
   @Bean
   TelemetryIngestionPort telemetryIngestionPort(
-      VehicleRepository vehicles, TransactionRunner transactions) {
-    return new TelemetryIngestionUseCase(vehicles, transactions);
+      VehicleRepository vehicles, TransactionRunner transactions, FaultReportListener faults) {
+    return new TelemetryIngestionUseCase(vehicles, transactions, faults);
   }
 
   @Configuration

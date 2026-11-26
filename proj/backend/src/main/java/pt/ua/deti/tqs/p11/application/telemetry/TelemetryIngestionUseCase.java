@@ -14,8 +14,9 @@ import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
  * is from 0 to 100, its vehicle is known and its timestamp is newer than the last one applied; any
  * other reading is discarded and logged, and changes nothing. The vehicle is locked while it is
  * changed, so a reading cannot race a booking or another reading of the same vehicle (K3). Hub,
- * lifecycle state and fault codes are not touched: the first two belong to the lifecycle (BR14,
- * BR16), and faults wait for maintenance (US10).
+ * lifecycle state are not touched here: they belong to the lifecycle (BR14, BR16). A reading that
+ * is applied and reports a fault is passed on to the FaultReportListener (BR18, US10), in the same
+ * transaction.
  */
 public class TelemetryIngestionUseCase implements TelemetryIngestionPort {
 
@@ -26,10 +27,13 @@ public class TelemetryIngestionUseCase implements TelemetryIngestionPort {
 
   private final VehicleRepository vehicles;
   private final TransactionRunner transactions;
+  private final FaultReportListener faults;
 
-  public TelemetryIngestionUseCase(VehicleRepository vehicles, TransactionRunner transactions) {
+  public TelemetryIngestionUseCase(
+      VehicleRepository vehicles, TransactionRunner transactions, FaultReportListener faults) {
     this.vehicles = Objects.requireNonNull(vehicles, "vehicles");
     this.transactions = Objects.requireNonNull(transactions, "transactions");
+    this.faults = Objects.requireNonNull(faults, "faults");
   }
 
   @Override

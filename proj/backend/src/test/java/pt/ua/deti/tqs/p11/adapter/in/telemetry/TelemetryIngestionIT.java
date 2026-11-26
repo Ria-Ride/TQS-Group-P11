@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static pt.ua.deti.tqs.p11.support.TelemetryMessages.FLEET;
 import static pt.ua.deti.tqs.p11.support.TelemetryMessages.reading;
+import static pt.ua.deti.tqs.p11.support.TelemetryMessages.readingWithFault;
 
 import java.time.Duration;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,8 +56,18 @@ class TelemetryIngestionIT {
     registry.add("app.telemetry.port", BROKER::port);
   }
 
+  /**
+   * A fault reading opens a ticket (US10). Other tests delete every vehicle, so no ticket may point
+   * to one when this test ends.
+   */
+  @AfterEach
+  void removeTheTickets() {
+    jdbc.update("DELETE FROM maintenance_tickets");
+  }
+
   @BeforeEach
   void startWithAnEmptyFleet() {
+    removeTheTickets();
     jdbc.update("DELETE FROM vehicle_state_changes");
     jdbc.update("DELETE FROM vehicles");
     jdbc.update("DELETE FROM hubs");
@@ -113,6 +125,67 @@ class TelemetryIngestionIT {
     BROKER.publishTelemetry(FLEET, "bike-0001", reading("bike-0001", "79", "2026-11-10T10:00:10Z"));
 
     awaitBattery("bike-0001", 79);
+  }
+
+  // ------------------------------------------------------------- faults (US10)
+
+  private List<Map<String, Object>> ticketsOf(String code) {
+    return jdbc.queryForList(
+        "SELECT t.fault_code, t.state FROM maintenance_tickets t"
+            + " JOIN vehicles v ON v.id = t.vehicle_id WHERE v.code = ? ORDER BY t.fault_code",
+        code);
+  }
+
+  private String stateOf(String code) {
+    return jdbc.queryForObject("SELECT state FROM vehicles WHERE code = ?", String.class, code);
+  }
+
+  /** BR18, BR19: through the real broker, as the simulator publishes it. */
+  @Test
+  void readingWithAFault_opensATicketAndSendsTheVehicleToMaintenance() {
+    vehicle("bike-0001");
+
+    BROKER.publishTelemetry(
+        FLEET,
+        "bike-0001",
+        readingWithFault("bike-0001", "78", "BRAKE_WEAR", "2026-11-10T10:00:00Z"));
+
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(() ->
+            assertThat(ticketsOf("bike-0001"))
+                .containsExactly(Map.of("fault_code", "BRAKE_WEAR", "state", "OPEN")));
+    assertThat(stateOf("bike-0001")).isEqualTo("MAINTENANCE");
+  }
+
+  /** BR20: the simulator repeats the fault while it lasts; the second reading opens nothing. */
+  @Test
+  void repeatedReadingsOfTheSameFault_keepOneTicket() {
+    vehicle("bike-0001");
+
+    BROKER.publishTelemetry(
+        FLEET,
+        "bike-0001",
+        readingWithFault("bike-0001", "80", "BRAKE_WEAR", "2026-11-10T10:00:00Z"));
+    BROKER.publishTelemetry(
+        FLEET,
+        "bike-0001",
+        readingWithFault("bike-0001", "79", "BRAKE_WEAR", "2026-11-10T10:00:10Z"));
+
+    awaitBattery("bike-0001", 79);
+    assertThat(ticketsOf("bike-0001"))
+        .containsExactly(Map.of("fault_code", "BRAKE_WEAR", "state", "OPEN"));
+  }
+
+  @Test
+  void readingWithoutAFault_opensNoTicket() {
+    vehicle("bike-0001");
+
+    BROKER.publishTelemetry(FLEET, "bike-0001", reading("bike-0001", "78", "2026-11-10T10:00:00Z"));
+
+    awaitBattery("bike-0001", 78);
+    assertThat(ticketsOf("bike-0001")).isEmpty();
+    assertThat(stateOf("bike-0001")).isEqualTo("AVAILABLE");
   }
 
   // ------------------------------------------------------------- BR17: discarded
