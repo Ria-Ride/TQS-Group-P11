@@ -97,6 +97,20 @@ a reading is only applied to a vehicle the platform knows.
 | `APP_DEMO_SEED_FLEET` | `false` (Compose: `true`) | Register the simulator's hubs and vehicles at start-up. Set both this and `APP_TELEMETRY_ENABLED` to `false` in `.env` for a run that must start with an empty fleet |
 | `SIMULATOR_VERSION`, `SIMULATOR_SCENARIO_FILE` | `1.0.0`, `ria-ride.yml` | Which simulator release and scenario Compose runs |
 
+### Maintenance tickets
+
+A reading with a fault code opens a maintenance ticket (US10), due 24 hours later, and an Available
+or Reserved vehicle goes to Maintenance; the fault repeated by later readings opens no other ticket.
+Operators see the open tickets, open one by hand and assign field technicians at
+`/operator/tickets` ("Maintenance tickets" on the home page). A vehicle with an open ticket cannot
+be activated. To watch it happen, run the simulator scenario with scripted faults by adding
+`SIMULATOR_SCENARIO_FILE=classpath:scenarios/ria-ride-faults.yml` to `.env`: about 30, 60 and 90
+seconds after the simulator starts, `bike-0001`, `scooter-0001` and `bike-0002` report a fault.
+
+| Setting (environment variable) | Default | Meaning |
+| --- | --- | --- |
+| `APP_MAINTENANCE_SLA_HOURS` | `24` | Contracted repair time (BR19): a ticket is due its opening time plus this; must be positive |
+
 To work on the fleet telemetry simulator, clone its repository into `proj/simulator` (that folder
 is git-ignored here, so the two repositories stay separate):
 
