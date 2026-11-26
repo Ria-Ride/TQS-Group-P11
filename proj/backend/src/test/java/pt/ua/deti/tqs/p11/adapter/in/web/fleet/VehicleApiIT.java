@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,8 +41,15 @@ class VehicleApiIT {
   private UUID hub03;
   private UUID hub05;
 
+  /** Tickets (US10) point to vehicles and users, which other tests delete. */
+  @AfterEach
+  void removeTheTickets() {
+    jdbc.update("DELETE FROM maintenance_tickets");
+  }
+
   @BeforeEach
   void loginAsOperatorWithTwoEmptyHubs() {
+    removeTheTickets();
     jdbc.update("DELETE FROM vehicle_state_changes");
     jdbc.update("DELETE FROM vehicles");
     jdbc.update("DELETE FROM hubs");
@@ -150,6 +158,40 @@ class VehicleApiIT {
     assertThat(response.getBody())
         .containsEntry("state", "AVAILABLE")
         .containsEntry("hubId", hub03.toString());
+  }
+
+  /** BR16: a vehicle with an open maintenance ticket (US10) cannot be offered. */
+  @Test
+  void activate_vehicleWithAnOpenTicket_returns409OnTheActionAndStaysDeactivated() {
+    UUID bike = operator.bike("bike-0009", hub03);
+    FleetApi.created(
+        operator.send(
+            HttpMethod.POST,
+            "/tickets",
+            Map.of("vehicleId", bike, "faultCode", "BRAKE_WEAR", "description", "Brakes squeak")));
+
+    ResponseEntity<Map<String, Object>> response = operator.transition(bike, "ACTIVATE");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(errors(response)).containsOnlyKeys("action");
+    assertThat(vehicle(bike)).containsEntry("state", "DEACTIVATED");
+  }
+
+  /** BR16: only open tickets count; a finished one does not keep the vehicle out of service. */
+  @Test
+  void activate_vehicleWhoseTicketIsFinished_returns200Available() {
+    UUID bike = operator.bike("bike-0009", hub03);
+    FleetApi.created(
+        operator.send(
+            HttpMethod.POST,
+            "/tickets",
+            Map.of("vehicleId", bike, "faultCode", "BRAKE_WEAR", "description", "Brakes squeak")));
+    jdbc.update("UPDATE maintenance_tickets SET state = 'CANCELLED' WHERE vehicle_id = ?", bike);
+
+    ResponseEntity<Map<String, Object>> response = operator.transition(bike, "ACTIVATE");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).containsEntry("state", "AVAILABLE");
   }
 
   @Test
