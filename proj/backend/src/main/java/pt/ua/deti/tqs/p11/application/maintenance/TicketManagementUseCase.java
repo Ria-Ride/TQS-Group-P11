@@ -1,12 +1,17 @@
 package pt.ua.deti.tqs.p11.application.maintenance;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
+import pt.ua.deti.tqs.p11.application.fleet.VehicleNotFoundException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
+import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
+import pt.ua.deti.tqs.p11.domain.maintenance.FaultCode;
 import pt.ua.deti.tqs.p11.domain.maintenance.MaintenanceTicket;
+import pt.ua.deti.tqs.p11.domain.maintenance.NotAFieldTechnicianException;
 import pt.ua.deti.tqs.p11.domain.user.User;
 
 /**
@@ -38,30 +43,50 @@ public class TicketManagementUseCase {
   /**
    * BR18, BR19, BR20: a manual ticket for the vehicle.
    *
-   * @throws pt.ua.deti.tqs.p11.application.fleet.VehicleNotFoundException if the vehicle is unknown
+   * @throws VehicleNotFoundException if the vehicle is unknown
    */
   public MaintenanceTicket open(OpenTicketCommand command) {
-    throw new UnsupportedOperationException("US10");
+    FaultCode fault = FaultCode.of(command.faultCode());
+    return transactions.inTransaction(() -> {
+      Vehicle vehicle =
+          vehicles
+              .findByIdForUpdate(command.vehicleId())
+              .orElseThrow(() -> new VehicleNotFoundException(command.vehicleId()));
+      return opener.openManually(vehicle, fault, command.description(), command.operatorId());
+    });
   }
 
   /** Every open ticket, the nearest SLA deadline first. */
   public List<MaintenanceTicket> openTickets() {
-    throw new UnsupportedOperationException("US10");
+    return tickets.findOpen();
   }
 
   /**
    * BR20: assigns the ticket to a field technician.
    *
    * @throws TicketNotFoundException if the ticket is unknown
-   * @throws pt.ua.deti.tqs.p11.domain.maintenance.NotAFieldTechnicianException if the account is
-   *     unknown or cannot take tickets
+   * @throws NotAFieldTechnicianException if the account is unknown or cannot take tickets
    */
   public MaintenanceTicket assign(UUID ticketId, UUID technicianId) {
-    throw new UnsupportedOperationException("US10");
+    return transactions.inTransaction(() -> {
+      MaintenanceTicket ticket =
+          tickets.findById(ticketId).orElseThrow(() -> new TicketNotFoundException(ticketId));
+      // An unknown account is refused like one that cannot take tickets: none is revealed.
+      User technician =
+          users
+              .findById(technicianId)
+              .orElseThrow(() -> new NotAFieldTechnicianException(technicianId));
+      MaintenanceTicket assigned = ticket.assignTo(technician);
+      tickets.save(assigned);
+      return assigned;
+    });
   }
 
   /** BR20: the accounts a ticket can be assigned to, by name. */
   public List<User> technicians() {
-    throw new UnsupportedOperationException("US10");
+    return users.findAll().stream()
+        .filter(MaintenanceTicket::canBeAssignedTo)
+        .sorted(Comparator.comparing(User::name))
+        .toList();
   }
 }

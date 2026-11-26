@@ -126,9 +126,7 @@ public record MaintenanceTicket(
     if (!ASSIGNABLE.contains(state)) {
       throw new ForbiddenTicketTransitionException(state, "assigned");
     }
-    if (technician.role() != Role.OPERATOR
-        || !technician.fieldTechnician()
-        || !technician.active()) {
+    if (!canBeAssignedTo(technician)) {
       throw new NotAFieldTechnicianException(technician.id());
     }
     return new MaintenanceTicket(
@@ -141,6 +139,11 @@ public record MaintenanceTicket(
         slaDeadline,
         openedBy,
         technician.id());
+  }
+
+  /** BR20: whether the account can take tickets: an active OPERATOR who is a field technician. */
+  public static boolean canBeAssignedTo(User user) {
+    return user.role() == Role.OPERATOR && user.fieldTechnician() && user.active();
   }
 
   /** BR19: the deadline is the opening time plus the contracted repair time. */

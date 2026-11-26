@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,16 +65,9 @@ public class OpenFaultTicketUseCase implements FaultReportListener {
     if (tickets.findOpenFor(vehicle.id(), fault).isPresent()) {
       return; // BR20: the simulator repeats the fault while it lasts; it is already covered.
     }
-    Instant now = clock.instant();
-    tickets.save(MaintenanceTicket.openFromFault(idGenerator.get(), vehicle.id(), fault, now, sla));
-    Vehicle after = vehicle.reportFault();
-    if (after.state() != vehicle.state()) {
-      vehicles.save(after);
-      history.save(VehicleStateChange.between(vehicle, after, now));
-    }
-    if (vehicle.state() == VehicleState.RESERVED) {
-      bookings.cancelReservedBookingOf(vehicle.id());
-    }
+    open(
+        vehicle,
+        now -> MaintenanceTicket.openFromFault(idGenerator.get(), vehicle.id(), fault, now, sla));
   }
 
   /**
@@ -84,6 +79,37 @@ public class OpenFaultTicketUseCase implements FaultReportListener {
    */
   public MaintenanceTicket openManually(
       Vehicle vehicle, FaultCode fault, String description, UUID operatorId) {
-    throw new UnsupportedOperationException("US10");
+    if (vehicle.state() == VehicleState.RETIRED) {
+      throw new VehicleRetiredException(vehicle.code());
+    }
+    Optional<MaintenanceTicket> covering = tickets.findOpenFor(vehicle.id(), fault);
+    if (covering.isPresent()) {
+      throw new FaultAlreadyCoveredException(vehicle.id(), fault, covering.get().id());
+    }
+    return open(
+        vehicle,
+        now ->
+            MaintenanceTicket.openManually(
+                idGenerator.get(), vehicle.id(), fault, description, operatorId, now, sla));
+  }
+
+  /**
+   * Saves the new ticket, then applies BR18 to the vehicle: Available and Reserved go to
+   * Maintenance, with the change in the history, and a Reserved booking is cancelled. The same for
+   * a fault reading and a manual ticket.
+   */
+  private MaintenanceTicket open(Vehicle vehicle, Function<Instant, MaintenanceTicket> newTicket) {
+    Instant now = clock.instant();
+    MaintenanceTicket ticket = newTicket.apply(now);
+    tickets.save(ticket);
+    Vehicle after = vehicle.reportFault();
+    if (after.state() != vehicle.state()) {
+      vehicles.save(after);
+      history.save(VehicleStateChange.between(vehicle, after, now));
+    }
+    if (vehicle.state() == VehicleState.RESERVED) {
+      bookings.cancelReservedBookingOf(vehicle.id());
+    }
+    return ticket;
   }
 }
