@@ -157,8 +157,7 @@ class BookingApiIT {
         .containsEntry("deposit", "30.00")
         .containsEntry("currency", "EUR")
         .containsKeys("id", "passId", "plannedStart", "plannedEnd", "startedAt");
-    assertThat(response.getHeaders().getLocation())
-        .hasToString("/bookings/" + body.get("id"));
+    assertThat(response.getHeaders().getLocation()).hasToString("/bookings/" + body.get("id"));
   }
 
   @Test
@@ -190,8 +189,7 @@ class BookingApiIT {
     UUID deactivated =
         FleetApi.id(FleetApi.created(operator.registerVehicle("bkapi-bike-2", "E_BIKE", hub)));
 
-    assertRefusedOn(
-        start(ana, deactivated, 60, "tok_approve"), HttpStatus.CONFLICT, "vehicleId");
+    assertRefusedOn(start(ana, deactivated, 60, "tok_approve"), HttpStatus.CONFLICT, "vehicleId");
   }
 
   @Test
@@ -253,8 +251,7 @@ class BookingApiIT {
     body.put("paymentToken", "tok_approve");
     String operatorToken =
         ApiClient.registerGuest(http, "Op Two", "op2.bookingapi@example.com", "Passw0rd!").token();
-    jdbc.update(
-        "UPDATE users SET role = 'OPERATOR' WHERE email = 'op2.bookingapi@example.com'");
+    jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE email = 'op2.bookingapi@example.com'");
 
     assertThat(start(operatorToken, body).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
   }
