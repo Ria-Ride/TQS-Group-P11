@@ -52,6 +52,7 @@ class BookingPersistenceAdapterIT {
   @AfterEach
   void removeTheRowsOfThisTest() {
     String mine = "(SELECT id FROM users WHERE email = '" + EMAIL + "')";
+    jdbc.update("DELETE FROM payments WHERE account_id IN " + mine);
     jdbc.update("DELETE FROM bookings WHERE account_id IN " + mine);
     jdbc.update("DELETE FROM passes WHERE account_id IN " + mine);
     jdbc.update("DELETE FROM vehicles WHERE code LIKE 'bk-it-%'");
@@ -180,6 +181,19 @@ class BookingPersistenceAdapterIT {
 
     assertThat(bookings.findById(first.id())).get().extracting(Booking::rules).isEqualTo(RULES);
     assertThat(bookings.findById(second.id())).get().extracting(Booking::rules).isEqualTo(changed);
+  }
+
+  /** BR6: the tourist's Reserved and Active bookings, which a new booking must not overlap. */
+  @Test
+  void findOngoingByAccount_returnsOnlyTheReservedAndActiveBookingsOfTheAccount() {
+    Booking completed = active(NOW, "au_1");
+    bookings.save(completed);
+    bookings.save(completed.complete(otherHub, NOW.plus(Duration.ofMinutes(70))));
+    Booking riding = active(NOW.plus(Duration.ofHours(2)), "au_2");
+    bookings.save(riding);
+
+    assertThat(bookings.findOngoingByAccount(ana)).containsExactly(riding);
+    assertThat(bookings.findOngoingByAccount(UUID.randomUUID())).isEmpty();
   }
 
   // ------------------------------------------------------------- database rules
