@@ -10,10 +10,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import pt.ua.deti.tqs.p11.application.billing.ChargeRequest;
 import pt.ua.deti.tqs.p11.application.billing.ChargeResult;
-import pt.ua.deti.tqs.p11.domain.billing.Money;
-import pt.ua.deti.tqs.p11.support.PaymentGatewayContainer;
 import pt.ua.deti.tqs.p11.application.billing.DepositRequest;
 import pt.ua.deti.tqs.p11.application.billing.DepositResult;
+import pt.ua.deti.tqs.p11.domain.billing.Money;
+import pt.ua.deti.tqs.p11.support.PaymentGatewayContainer;
 
 /**
  * The payment adapter against the simulated gateway in a container (KAN-96): approved, declined and
@@ -96,7 +96,7 @@ class PaymentGatewayAdapterIT {
     assertThat(again).isEqualTo(first);
   }
 
-    // ------------------------------------------------------------- deposits (US04)
+  // ------------------------------------------------------------- deposits (US04)
 
   private static final Money DEPOSIT = Money.of("30.00");
 
@@ -140,9 +140,9 @@ class PaymentGatewayAdapterIT {
   }
 
   /**
-   * BR11: the gateway held the deposit but the answer came too late. The adapter gives up after
-   * its read timeout; releasing with the same payment id gives the deposit back, which a capture
-   * then proves by being refused.
+   * BR11: the gateway held the deposit but the answer came too late. The adapter gives up after its
+   * read timeout; releasing with the same payment id gives the deposit back, which a capture then
+   * proves by being refused.
    */
   @Test
   void authorize_noAnswerInTime_isTimedOut_andReleasingGivesTheDepositBack() {
