@@ -68,8 +68,7 @@ class VehicleTypeApiIT {
 
   @Test
   void vehicleTypes_withoutAToken_is401() {
-    assertThat(
-            http.get().uri("/vehicle-types").retrieve().toBodilessEntity().getStatusCode())
+    assertThat(http.get().uri("/vehicle-types").retrieve().toBodilessEntity().getStatusCode())
         .isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 }
