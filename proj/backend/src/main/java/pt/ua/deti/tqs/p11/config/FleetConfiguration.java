@@ -27,15 +27,6 @@ class FleetConfiguration {
     return new SpringTransactionRunner(new TransactionTemplate(transactionManager));
   }
 
-  /**
-   * Maintenance tickets arrive with US10, which replaces this bean with one that reads them. Until
-   * then no vehicle has an open ticket.
-   */
-  @Bean
-  OpenTickets openTickets() {
-    return vehicleId -> false;
-  }
-
   @Bean
   HubManagementUseCase hubManagementUseCase(
       HubRepository hubs, VehicleRepository vehicles, TransactionRunner transactions) {

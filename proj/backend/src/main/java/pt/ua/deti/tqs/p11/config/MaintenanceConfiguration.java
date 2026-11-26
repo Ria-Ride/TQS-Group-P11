@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
+import pt.ua.deti.tqs.p11.application.fleet.OpenTickets;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleStateChangeRepository;
 import pt.ua.deti.tqs.p11.application.maintenance.FaultBookingCancellation;
@@ -26,6 +27,12 @@ class MaintenanceConfiguration {
   @Bean
   FaultBookingCancellation faultBookingCancellation() {
     return vehicleId -> {};
+  }
+
+  /** BR16: fleet asks whether a vehicle may be activated; maintenance answers from its tickets. */
+  @Bean
+  OpenTickets openTickets(TicketRepository tickets) {
+    return tickets::existsOpenFor;
   }
 
   @Bean
