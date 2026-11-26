@@ -57,6 +57,22 @@ public class FleetSteps {
     return state.replaceAll("([a-z])([A-Z])", "$1_$2").toUpperCase();
   }
 
+  /**
+   * "an operator is logged in" creates the operator; features that only check vehicles (US04) get
+   * one on first use, with its own email so it never clashes with the accounts of other steps.
+   */
+  private FleetApi operator() {
+    if (operator == null) {
+      RestClient client = ApiClient.forPort(port);
+      Registered checker =
+          ApiClient.registerGuest(
+              client, "Fleet Checker", "fleet.checker@example.com", "Passw0rd!");
+      jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE id = ?", checker.id());
+      operator = new FleetApi(client, checker.token());
+    }
+    return operator;
+  }
+
   private UUID hubId(String code) {
     return operator.getList("/hubs").getBody().stream()
         .filter(hub -> code.equals(hub.get("code")))
@@ -66,7 +82,7 @@ public class FleetSteps {
   }
 
   private UUID vehicleId(String code) {
-    return operator.getList("/vehicles").getBody().stream()
+    return operator().getList("/vehicles").getBody().stream()
         .filter(vehicle -> code.equals(vehicle.get("code")))
         .map(vehicle -> UUID.fromString((String) vehicle.get("id")))
         .findFirst()
@@ -82,7 +98,7 @@ public class FleetSteps {
   }
 
   private Map<String, Object> vehicle(String code) {
-    return operator.get("/vehicles/" + vehicleId(code)).getBody();
+    return operator().get("/vehicles/" + vehicleId(code)).getBody();
   }
 
   private UUID createHub(String code, int capacity) {

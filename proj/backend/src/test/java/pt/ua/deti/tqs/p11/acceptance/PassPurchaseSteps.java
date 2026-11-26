@@ -87,7 +87,7 @@ public class PassPurchaseSteps {
 
   // ------------------------------------------------------------- helpers
 
-  private Registered tourist(String name) {
+  Registered tourist(String name) {
     return tourists.get(name);
   }
 
