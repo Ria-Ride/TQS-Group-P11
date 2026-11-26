@@ -115,7 +115,7 @@ class StayManagementPersistenceIT {
     accommodations.save(hotel());
     stays.add(
         new Stay(
-            STAY_ID, "IT-LATE", hotel(), LocalDate.of(2027, 6, 1), LocalDate.of(2027, 6, 3), null));
+            STAY_ID, "IT-LATE", hotel(), LocalDate.of(2030, 6, 1), LocalDate.of(2030, 6, 3), null));
 
     assertThat(stays.findAll()).first().extracting(Stay::code).isEqualTo("IT-LATE");
     assertThat(stays.findAll()).extracting(Stay::code).contains("RIA-DEMO-01");

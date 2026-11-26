@@ -230,9 +230,9 @@ class StayCodeApiIT {
   }
 
   @Test
-  void getStayCodes_listsTheIssuedOnesWithTheirHotelAndDates() {
+  void getStayCodes_listsTheIssuedOnesWithTheirHotelAndDates_newestCheckInFirst() {
     UUID hotel = hotel("IT HOTEL Laguna", 15);
-    String code = (String) issue(manager, hotel, "2027-06-01", "2027-06-03").getBody().get("code");
+    String code = (String) issue(manager, hotel, "2030-06-01", "2030-06-03").getBody().get("code");
 
     List<Map<String, Object>> codes = manager.getList("/stay-codes").getBody();
 
@@ -240,8 +240,8 @@ class StayCodeApiIT {
         .containsEntry("code", code)
         .containsEntry("accommodationName", "IT HOTEL Laguna")
         .containsEntry("discountPercent", 15)
-        .containsEntry("checkIn", "2027-06-01")
-        .containsEntry("checkOut", "2027-06-03")
+        .containsEntry("checkIn", "2030-06-01")
+        .containsEntry("checkOut", "2030-06-03")
         .containsEntry("redeemed", false);
     assertThat(codes).extracting(found -> found.get("code")).contains("RIA-DEMO-01");
   }
