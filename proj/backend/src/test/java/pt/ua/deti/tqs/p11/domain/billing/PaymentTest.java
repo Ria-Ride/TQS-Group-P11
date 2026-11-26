@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Money movements, kept whether or not they went through (payment lifecycle, Product Specs 3.3):
@@ -48,53 +50,88 @@ class PaymentTest {
 
   @Test
   void new_capturedWithoutAPass_isRefused() {
-    assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.PASS, PRICE, PaymentState.CAPTURED, "ch_1", null, null,
-                    null, AT))
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.PASS,
+                PRICE,
+                PaymentState.CAPTURED,
+                "ch_1",
+                null,
+                null,
+                null,
+                AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void new_capturedWithoutAGatewayReference_isRefused() {
-    assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.PASS, PRICE, PaymentState.CAPTURED, null, null, PASS,
-                    null, AT))
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.PASS,
+                PRICE,
+                PaymentState.CAPTURED,
+                null,
+                null,
+                PASS,
+                null,
+                AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   /** BR10: no pass is issued for a payment that was not approved. */
   @Test
   void new_declinedWithAPass_isRefused() {
-    assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.PASS, PRICE, PaymentState.DECLINED, null, "timeout",
-                    PASS, null, AT))
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.PASS,
+                PRICE,
+                PaymentState.DECLINED,
+                null,
+                "timeout",
+                PASS,
+                null,
+                AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void new_declinedWithoutAReason_isRefused() {
-    assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.PASS, PRICE, PaymentState.DECLINED, null, null, null,
-                    null, AT))
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.PASS,
+                PRICE,
+                PaymentState.DECLINED,
+                null,
+                null,
+                null,
+                null,
+                AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   /** A pass is charged at once: it is never only authorized. */
   @Test
   void new_authorizedPassPayment_isRefused() {
-    assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.PASS, PRICE, PaymentState.AUTHORIZED, "ch_1", null, null,
-                    null, AT))
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.PASS,
+                PRICE,
+                PaymentState.AUTHORIZED,
+                "ch_1",
+                null,
+                null,
+                null,
+                AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -149,32 +186,97 @@ class PaymentTest {
 
   @Test
   void new_depositWithAPass_isRefused() {
-    assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.DEPOSIT, DEPOSIT, PaymentState.AUTHORIZED, "au_1", null,
-                    PASS, BOOKING, AT))
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.DEPOSIT,
+                DEPOSIT,
+                PaymentState.AUTHORIZED,
+                "au_1",
+                null,
+                PASS,
+                BOOKING,
+                AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void new_declinedDepositWithABooking_isRefused() {
-    assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.DEPOSIT, DEPOSIT, PaymentState.DECLINED, null,
-                    "card_declined", null, BOOKING, AT))
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.DEPOSIT,
+                DEPOSIT,
+                PaymentState.DECLINED,
+                null,
+                "card_declined",
+                null,
+                BOOKING,
+                AT))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   /** A captured deposit needs the amount taken, which US06 adds with the overtime charge. */
   @Test
   void new_capturedDeposit_isRefusedUntilTheCaptureIsModelled() {
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.DEPOSIT,
+                DEPOSIT,
+                PaymentState.CAPTURED,
+                "au_1",
+                null,
+                null,
+                BOOKING,
+                AT))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  // ------------------------------------------------------------- every field rule
+
+  private static String orNull(String cell) {
+    return "-".equals(cell) ? null : cell;
+  }
+
+  private static UUID idOrNull(String cell, UUID id) {
+    return "-".equals(cell) ? null : id;
+  }
+
+  /**
+   * Each row breaks exactly one field rule of its kind and state ("-" is no value), so every part
+   * of every rule is shown to matter: removing one would let its row through.
+   */
+  @ParameterizedTest(name = "{0} {1}: {6}")
+  @CsvSource({
+    "PASS,    CAPTURED,   ch_1, oops, pass, -,       a captured pass has no reason",
+    "PASS,    CAPTURED,   ch_1, -,    pass, booking, a pass payment has no booking",
+    "PASS,    RELEASED,   ch_1, -,    -,    -,       a pass is never released",
+    "DEPOSIT, AUTHORIZED, au_1, oops, -,    booking, a held deposit has no reason",
+    "DEPOSIT, RELEASED,   -,    -,    -,    booking, a released deposit has its reference",
+    "DEPOSIT, RELEASED,   au_1, oops, -,    booking, a released deposit has no reason",
+    "DEPOSIT, DECLINED,   -,    -,    -,    -,       a declined deposit has a reason"
+  })
+  void new_fieldsThatDoNotFitTheKindAndState_areRefused(
+      PaymentKind kind,
+      PaymentState state,
+      String reference,
+      String reason,
+      String pass,
+      String booking,
+      String rule) {
+    Money amount = kind == PaymentKind.PASS ? PRICE : DEPOSIT;
+    String ref = orNull(reference);
+    String why = orNull(reason);
+    UUID passId = idOrNull(pass, PASS);
+    UUID bookingId = idOrNull(booking, BOOKING);
+
     assertThatThrownBy(
-            () ->
-                new Payment(
-                    ID, ANA, PaymentKind.DEPOSIT, DEPOSIT, PaymentState.CAPTURED, "au_1", null,
-                    null, BOOKING, AT))
+            () -> new Payment(ID, ANA, kind, amount, state, ref, why, passId, bookingId, AT))
+        .as(rule)
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

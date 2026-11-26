@@ -1,10 +1,13 @@
 package pt.ua.deti.tqs.p11.adapter.out.persistence.booking;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import pt.ua.deti.tqs.p11.application.booking.BookingRepository;
 import pt.ua.deti.tqs.p11.domain.booking.Booking;
+import pt.ua.deti.tqs.p11.domain.booking.BookingState;
 
 /**
  * BookingRepository backed by PostgreSQL through Spring Data JPA. Saves are flushed at once, so a
@@ -14,6 +17,10 @@ import pt.ua.deti.tqs.p11.domain.booking.Booking;
 class BookingPersistenceAdapter implements BookingRepository {
 
   private final SpringDataBookingRepository repository;
+
+  /** The states that hold a vehicle and a period, as BookingState says. */
+  private static final List<BookingState> ONGOING =
+      Arrays.stream(BookingState.values()).filter(BookingState::isOngoing).toList();
 
   BookingPersistenceAdapter(SpringDataBookingRepository repository) {
     this.repository = repository;
@@ -27,5 +34,12 @@ class BookingPersistenceAdapter implements BookingRepository {
   @Override
   public Optional<Booking> findById(UUID id) {
     return repository.findById(id).map(BookingJpaEntity::toDomain);
+  }
+
+  @Override
+  public List<Booking> findOngoingByAccount(UUID accountId) {
+    return repository.findByAccountIdAndStateInOrderByPlannedStartAsc(accountId, ONGOING).stream()
+        .map(BookingJpaEntity::toDomain)
+        .toList();
   }
 }

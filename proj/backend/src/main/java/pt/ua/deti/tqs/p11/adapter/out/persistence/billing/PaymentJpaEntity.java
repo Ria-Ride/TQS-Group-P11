@@ -10,9 +10,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import pt.ua.deti.tqs.p11.domain.billing.Payment;
+import pt.ua.deti.tqs.p11.domain.billing.PaymentKind;
 import pt.ua.deti.tqs.p11.domain.billing.PaymentState;
 
-/** JPA mapping of payments. Payments are only inserted. */
+/** JPA mapping of payments: pass charges (US03) and booking deposits (US04). */
 @Entity
 @Table(name = "payments")
 class PaymentJpaEntity {
@@ -22,8 +23,15 @@ class PaymentJpaEntity {
   @Column(name = "account_id", nullable = false)
   private UUID accountId;
 
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private PaymentKind kind;
+
   @Column(name = "pass_id")
   private UUID passId;
+
+  @Column(name = "booking_id")
+  private UUID bookingId;
 
   @Column(nullable = false, precision = 10, scale = 2)
   private BigDecimal amount;
@@ -54,6 +62,8 @@ class PaymentJpaEntity {
     entity.gatewayReference = payment.gatewayReference().orElse(null);
     entity.failureReason = payment.failureReason().orElse(null);
     entity.createdAt = payment.at();
+    entity.kind = payment.kind();
+    entity.bookingId = payment.bookingId().orElse(null);
     return entity;
   }
 }

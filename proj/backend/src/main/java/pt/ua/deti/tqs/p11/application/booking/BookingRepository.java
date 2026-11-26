@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.application.booking;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import pt.ua.deti.tqs.p11.domain.booking.Booking;
@@ -11,4 +12,7 @@ public interface BookingRepository {
   Booking save(Booking booking);
 
   Optional<Booking> findById(UUID id);
+
+  /** BR6: the account's Reserved and Active bookings, earliest planned start first. */
+  List<Booking> findOngoingByAccount(UUID accountId);
 }

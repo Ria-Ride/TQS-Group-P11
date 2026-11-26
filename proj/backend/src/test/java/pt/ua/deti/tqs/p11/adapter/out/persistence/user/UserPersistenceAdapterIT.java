@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,13 +14,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pt.ua.deti.tqs.p11.TestcontainersConfiguration;
+import pt.ua.deti.tqs.p11.application.TransactionRunner;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
 import pt.ua.deti.tqs.p11.domain.user.EmailAddress;
 import pt.ua.deti.tqs.p11.domain.user.Role;
 import pt.ua.deti.tqs.p11.domain.user.User;
-import java.util.Optional;
-import pt.ua.deti.tqs.p11.application.TransactionRunner;
 
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
