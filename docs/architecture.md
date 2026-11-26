@@ -90,7 +90,7 @@ Solid arrows are calls (dependency direction). Dependencies between modules form
 
 | Event | Published by | Reacted to by | Why an event |
 |-------|--------------|---------------|--------------|
-| `VehicleFaultReported` | Fleet | Maintenance (opens a ticket); Passes and Booking (cancels the affected Reserved bookings, with reason "vehicle fault", and asks Billing to release their deposits) | Fleet must not depend on Maintenance or Booking, which both call Fleet |
+| `VehicleFaultReported` | Fleet | Maintenance (opens a ticket); Passes and Booking (cancels the affected Reserved bookings, with reason "vehicle fault", and asks Billing to release their deposits) | Fleet must not depend on Maintenance or Booking, which both call Fleet. Built (US10) as the port `FaultReportListener`, owned by Fleet and implemented by Maintenance, called in the transaction that applied the reading, with the vehicle still locked; Maintenance asks Booking through the port `FaultBookingCancellation` (implemented with bookings, US05) |
 | `VehicleStateChanged` | Fleet | Client Rules and KPIs (availability against the SLA, utilization) | The KPIs need how long each vehicle stayed in each state; Fleet must not know about KPIs |
 | `BookingStarted`, `BookingEnded` | Passes and Booking | Client Rules and KPIs (utilization), Notifications | Read-side and side effects must not slow or break booking |
 | `BookingCancelled` | Passes and Booking | Notifications | In the MVP the user sees the cancellation and its reason in the dashboard. Active notification arrives with the Notifications module |
@@ -102,7 +102,7 @@ Solid arrows are calls (dependency direction). Dependencies between modules form
 | Fleet | Vehicles, hubs, vehicle lifecycle, relocation of vehicles between hubs (rebalancing), applying telemetry readings, state history, hub capacities. The only module that changes vehicle state: it checks state, minimum battery and hub capacity inside one atomic operation, locking the vehicle and then the hub. Reads the minimum battery from Client Rules |
 | Passes and Booking | Pass types and passes, stay codes issued by the client and redeemed by guests, bookings and immediate starts, ending a booking at a hub, expiry and cancellation. Reads which vehicle types a pass allows from Client Rules |
 | Billing | Pass price and stay discount, pass payment, deposit authorization, overtime charge, capture and release of the deposit; talks to the payment gateway through `PaymentPort` |
-| Maintenance | Maintenance tickets with SLA deadlines, assignment to field technicians, closing. Two entry points: the `VehicleFaultReported` event, and a REST endpoint for operators (faults the simulator cannot detect). A vehicle cannot have two open tickets for the same fault: a manual ticket on a covered fault links to the existing ticket or is refused |
+| Maintenance | Maintenance tickets with SLA deadlines, assignment to field technicians, closing. Two entry points: `FaultReportListener` (a reading with a fault) and a REST endpoint for operators (faults the simulator cannot detect). A vehicle cannot have two open tickets for the same fault (also checked by a partial unique index): a repeated fault reading opens nothing, and a manual ticket on a covered fault is refused with the id of the open ticket. On a new ticket it applies Fleet's own fault transition (Available or Reserved to Maintenance) to the vehicle, which the caller has locked. Faults of a Retired vehicle open no ticket |
 | Client Rules and KPIs | Configuration set by the client: maximum booking duration, minimum battery and battery used per 30 minutes of riding (per vehicle type), vehicle types per pass type, deposit amounts, overtime and window parameters, SLA targets. Also the business and technical KPIs |
 | Routes (low priority) | Suggested routes between hubs |
 | Notifications (low priority) | Booking confirmation, end-of-use reminder, SLA breach alert, booking cancellation |
@@ -207,7 +207,7 @@ sequenceDiagram
   end
 ```
 
-**Fault reported while a booking is reserved.** Fleet announces the fault; Maintenance and Booking each react, and the user sees the cancellation in the dashboard.
+**Fault reported while a booking is reserved.** Fleet tells Maintenance through a port it owns; Maintenance opens the ticket and asks Booking to cancel the reservation, and the user sees the cancellation in the dashboard. Everything up to the cancellation happens in the transaction of the reading, with the vehicle locked, so two readings of the same fault cannot both open a ticket.
 
 ```mermaid
 sequenceDiagram
@@ -222,11 +222,12 @@ sequenceDiagram
 
   SIM-)MQ: reading with fault code
   MQ->>FL: TelemetryIngestionPort.report(VehicleReading)
-  Note over FL: vehicle goes from available or reserved to maintenance
-  FL-)MT: VehicleFaultReported
-  FL-)BK: VehicleFaultReported
-  MT->>MT: open ticket (no second ticket for the same fault)
-  BK->>BK: cancel Reserved bookings of the vehicle (reason: vehicle fault)
+  Note over FL: reading applied, vehicle locked
+  FL->>MT: FaultReportListener.faultReported(vehicle, fault)
+  MT->>MT: open ticket (none if the fault already has an open one)
+  Note over MT: Fleet's transition: available or reserved to maintenance
+  MT->>BK: FaultBookingCancellation.cancelReservedBookingOf(vehicle)
+  BK->>BK: cancel the Reserved booking (reason: vehicle fault)
   BK->>BL: releaseDeposit
   BL->>GW: release
 ```

@@ -78,7 +78,11 @@ class SecurityConfiguration {
                 .authenticated()
                 // Fleet operations and maintenance (US08, US10-US12).
                 .requestMatchers(
-                    HttpMethod.GET, "/vehicles/{id}/history", "/tickets", "/fleet/overview")
+                    HttpMethod.GET,
+                    "/vehicles/{id}/history",
+                    "/tickets",
+                    "/technicians",
+                    "/fleet/overview")
                 .hasAnyRole(OPERATOR, ADMIN)
                 .requestMatchers(
                     HttpMethod.POST,

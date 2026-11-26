@@ -6,6 +6,7 @@ import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SearchPage } from "./pages/SearchPage";
+import { TicketsPage } from "./pages/TicketsPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/passes/buy" element={<BuyPassPage />} />
       <Route path="/admin/users" element={<AdminUsersPage />} />
       <Route path="/operator/fleet" element={<FleetPage />} />
+      <Route path="/operator/tickets" element={<TicketsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

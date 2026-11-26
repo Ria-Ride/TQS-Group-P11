@@ -132,6 +132,36 @@ describe("home page", () => {
     expect(screen.queryByRole("link", { name: "Manage accounts" })).not.toBeInTheDocument();
   });
 
+  it.each(["OPERATOR", "ADMIN"])("offers the maintenance tickets to an %s", async (role) => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Rui Costa",
+      email: "rui.costa@example.com",
+      role,
+    });
+    renderApp("/");
+
+    expect(await screen.findByRole("link", { name: "Maintenance tickets" })).toHaveAttribute(
+      "href",
+      "/operator/tickets",
+    );
+  });
+
+  it("does not offer the maintenance tickets to a tourist", async () => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Ana Sousa",
+      email: "ana.sousa@example.com",
+      role: "END_USER",
+    });
+    renderApp("/");
+
+    await screen.findByRole("heading", { name: "Hello, Ana Sousa" });
+    expect(screen.queryByRole("link", { name: "Maintenance tickets" })).not.toBeInTheDocument();
+  });
+
   it("does not offer fleet management to a tourist", async () => {
     saveSession(session);
     vi.mocked(getProfile).mockResolvedValue({

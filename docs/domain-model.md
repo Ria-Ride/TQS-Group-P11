@@ -307,6 +307,7 @@ stateDiagram-v2
   direction LR
   [*] --> Open : fault reading, or operator opens manually
   Open --> Assigned : operator assigns a field technician
+  Assigned --> Assigned : operator assigns another field technician
   Assigned --> InProgress : technician starts the job
   InProgress --> Closed : technician records the work and closes
   Open --> Cancelled : false alarm or duplicate
@@ -314,6 +315,8 @@ stateDiagram-v2
   Closed --> [*]
   Cancelled --> [*]
 ```
+
+A ticket is **open** while it is Open, Assigned or InProgress. A vehicle has at most one open ticket per fault code (BR20): the simulator repeats the current fault in every reading, and only the first reading opens a ticket; a manual ticket for a fault already covered is refused, with the id of the open ticket. A different fault opens a ticket of its own. A Retired vehicle gets no ticket. The SLA deadline is the opening time plus the contracted repair time, 24 hours by default (BR19). Only an active OPERATOR with `fieldTechnician` set can be assigned, and a ticket can be reassigned until the job starts (BR20).
 
 Closing needs a non-empty record of the work done. Missing the SLA deadline does not change the state; it marks the ticket as breached for the KPIs and alerts. When a ticket is closed or cancelled, the vehicle leaves Maintenance only if no other ticket is open for it.
 
