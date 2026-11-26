@@ -12,13 +12,7 @@ import {
 import { clearSession, loadSession } from "../auth/session";
 import { Logo } from "../components/Logo";
 import { GENERIC_ERROR } from "./messages";
-
-/** The test cards of the simulated gateway: each one decides the gateway's answer. */
-const TEST_CARDS = [
-  { token: "tok_approve", label: "Payment approved" },
-  { token: "tok_decline", label: "Payment declined" },
-  { token: "tok_timeout", label: "No answer from the bank (times out)" },
-] as const;
+import { TEST_CARDS } from "./testCards";
 
 /** The backend's stay-code reasons (BR9), written for tourists. */
 const STAY_CODE_MESSAGES: Record<string, string> = {
