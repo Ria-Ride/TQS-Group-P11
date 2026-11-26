@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { BuyPassPage } from "./pages/BuyPassPage";
+import { ClientPage } from "./pages/ClientPage";
 import { FleetPage } from "./pages/FleetPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/vehicles/search" element={<SearchPage />} />
       <Route path="/passes/buy" element={<BuyPassPage />} />
+      <Route path="/client" element={<ClientPage />} />
       <Route path="/admin/users" element={<AdminUsersPage />} />
       <Route path="/operator/fleet" element={<FleetPage />} />
       <Route path="/operator/tickets" element={<TicketsPage />} />
