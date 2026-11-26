@@ -22,6 +22,8 @@ import pt.ua.deti.tqs.p11.domain.booking.Booking;
 import pt.ua.deti.tqs.p11.domain.booking.BookingRules;
 import pt.ua.deti.tqs.p11.domain.booking.BookingState;
 import pt.ua.deti.tqs.p11.domain.booking.BookingTerms;
+import pt.ua.deti.tqs.p11.domain.booking.BookingRefusal;
+import pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException;
 
 /** Bookings and the rules they keep (BR21), against a real PostgreSQL. */
 @SpringBootTest
@@ -198,14 +200,20 @@ class BookingPersistenceAdapterIT {
 
   // ------------------------------------------------------------- database rules
 
-  /** BR3: at most one Reserved or Active booking per vehicle, whoever writes the row. */
+  /**
+   * BR3: at most one Reserved or Active booking per vehicle, whoever writes the row. The vehicle
+   * lock of the use case makes this unreachable through it; if a future path forgets the lock, the
+   * index still refuses, and the refusal is the same one the tourist gets for a taken vehicle.
+   */
   @Test
-  void database_refusesASecondOngoingBookingOfTheSameVehicle() {
+  void save_secondOngoingBookingOfTheSameVehicle_isRefusedAsNotAvailable() {
     bookings.save(active(NOW, "au_1"));
     Booking another = active(NOW.plus(Duration.ofMinutes(5)), "au_2");
 
     assertThatThrownBy(() -> bookings.save(another))
-        .isInstanceOf(DataIntegrityViolationException.class);
+        .isInstanceOfSatisfying(
+            BookingRefusedException.class,
+            e -> assertThat(e.reason()).isEqualTo(BookingRefusal.VEHICLE_NOT_AVAILABLE));
   }
 
   @Test

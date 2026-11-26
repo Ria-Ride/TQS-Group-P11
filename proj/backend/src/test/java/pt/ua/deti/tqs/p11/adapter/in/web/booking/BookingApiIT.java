@@ -26,11 +26,21 @@ import pt.ua.deti.tqs.p11.support.ApiClient;
 import pt.ua.deti.tqs.p11.support.ApiClient.Registered;
 import pt.ua.deti.tqs.p11.support.FleetApi;
 import pt.ua.deti.tqs.p11.support.PaymentGatewayContainer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.RepeatedTest;
 
 /**
  * POST /bookings for an immediate start (US04) over HTTP, with a real database and the simulated
  * gateway in a container. The rules are tested in the domain and use case tests; here the status
- * codes, the body, the Location and the error field of each refusal (decision D4).
+ * codes, the body, the Location and the error field of each refusal (decision D4), and simultaneous
+ * requests against the real database locks (BR3, BR6; KAN-702).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
@@ -254,5 +264,115 @@ class BookingApiIT {
     jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE email = 'op2.bookingapi@example.com'");
 
     assertThat(start(operatorToken, body).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+  }
+
+
+  private static final String RIDERS = "'rider%.bookingapi@example.com'";
+
+  private List<Registered> ridersWithADayPass(int count) {
+    List<Registered> riders = new ArrayList<>();
+    for (int i = 1; i <= count; i++) {
+      Registered rider =
+          ApiClient.registerGuest(
+              http, "Rider " + i, "rider" + i + ".bookingapi@example.com", "Passw0rd!");
+      buyADayPass(rider);
+      riders.add(rider);
+    }
+    return riders;
+  }
+
+  /** Every request waits at one latch, then all go out together, each on its own thread. */
+  private static List<ResponseEntity<Map<String, Object>>> allAtOnce(
+      List<Callable<ResponseEntity<Map<String, Object>>>> requests) throws Exception {
+    ExecutorService pool = Executors.newFixedThreadPool(requests.size());
+    try {
+      CountDownLatch go = new CountDownLatch(1);
+      List<Future<ResponseEntity<Map<String, Object>>>> sent = new ArrayList<>();
+      for (Callable<ResponseEntity<Map<String, Object>>> request : requests) {
+        sent.add(
+            pool.submit(() -> {
+              go.await();
+              return request.call();
+            }));
+      }
+      go.countDown();
+      List<ResponseEntity<Map<String, Object>>> answers = new ArrayList<>();
+      for (Future<ResponseEntity<Map<String, Object>>> answer : sent) {
+        answers.add(answer.get(30, TimeUnit.SECONDS));
+      }
+      return answers;
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  private int count(String sql, Object... args) {
+    Integer found = jdbc.queryForObject(sql, Integer.class, args);
+    return found == null ? 0 : found;
+  }
+
+  /**
+   * BR3: of n tourists asking for the same bike at once, exactly one gets it; every other one is
+   * told the vehicle is not available, and only the winner keeps a held deposit.
+   */
+  private void raceForTheBike(int tourists) throws Exception {
+    List<Callable<ResponseEntity<Map<String, Object>>>> requests = new ArrayList<>();
+    for (Registered rider : ridersWithADayPass(tourists)) {
+      requests.add(() -> start(rider, bike, 60, "tok_approve"));
+    }
+
+    List<ResponseEntity<Map<String, Object>>> answers = allAtOnce(requests);
+
+    assertThat(answers).filteredOn(a -> a.getStatusCode() == HttpStatus.CREATED).hasSize(1);
+    assertThat(answers)
+        .filteredOn(a -> a.getStatusCode() == HttpStatus.CONFLICT)
+        .allSatisfy(a -> assertThat(FleetApi.errors(a)).containsKey("vehicleId"))
+        .hasSize(tourists - 1);
+    assertThat(
+            count(
+                "SELECT COUNT(*) FROM bookings WHERE vehicle_id = ? AND state = 'ACTIVE'", bike))
+        .isEqualTo(1);
+    assertThat(
+            count(
+                "SELECT COUNT(*) FROM payments p JOIN users u ON u.id = p.account_id"
+                    + " WHERE u.email LIKE " + RIDERS
+                    + " AND p.kind = 'DEPOSIT' AND p.state = 'AUTHORIZED'"))
+        .as("only the winner keeps a held deposit")
+        .isEqualTo(1);
+    assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "IN_USE");
+  }
+
+  @Test
+  void twoSimultaneousStarts_exactlyOneGetsTheBike() throws Exception {
+    raceForTheBike(2);
+  }
+
+  /** Repeated on every build, so a flaky lock shows up in CI and not in the demo. */
+  @RepeatedTest(5)
+  void tenSimultaneousStarts_exactlyOneGetsTheBike() throws Exception {
+    raceForTheBike(10);
+  }
+
+  /** BR6, D2: one tourist asks for two vehicles at once; the account lock lets one ride through. */
+  @Test
+  void oneTouristStartingTwoVehiclesAtOnce_ridesOnlyOne() throws Exception {
+    UUID other = availableVehicle("bkapi-bike-4", "E_BIKE");
+
+    List<ResponseEntity<Map<String, Object>>> answers =
+        allAtOnce(
+            List.of(
+                () -> start(ana, bike, 60, "tok_approve"),
+                () -> start(ana, other, 60, "tok_approve")));
+
+    assertThat(answers).filteredOn(a -> a.getStatusCode() == HttpStatus.CREATED).hasSize(1);
+    assertThat(answers)
+        .filteredOn(a -> a.getStatusCode() == HttpStatus.CONFLICT)
+        .singleElement()
+        .satisfies(a -> assertThat(FleetApi.errors(a)).containsKey("booking"));
+    assertThat(
+            count(
+                "SELECT COUNT(*) FROM bookings WHERE account_id = ? AND state = 'ACTIVE'",
+                ana.id()))
+        .isEqualTo(1);
   }
 }
