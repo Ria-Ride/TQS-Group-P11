@@ -55,8 +55,10 @@ public class TelemetryIngestionUseCase implements TelemetryIngestionPort {
     if (!vehicle.acceptsReadingAt(reading.timestamp())) {
       return discarded(reading, ReadingOutcome.STALE);
     }
-    vehicles.save(
-        vehicle.withReading(battery, reading.lockState(), reading.position(), reading.timestamp()));
+    Vehicle updated =
+        vehicle.withReading(battery, reading.lockState(), reading.position(), reading.timestamp());
+    vehicles.save(updated);
+    reading.fault().ifPresent(fault -> faults.faultReported(updated, fault));
     return ReadingOutcome.APPLIED;
   }
 

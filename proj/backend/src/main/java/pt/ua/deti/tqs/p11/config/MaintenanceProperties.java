@@ -12,6 +12,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties("app.maintenance")
 public record MaintenanceProperties(@DefaultValue("24") int slaHours) {
 
+  /** Refuses a repair time of zero or less, so a wrong value stops the start-up. */
+  public MaintenanceProperties {
+    if (slaHours <= 0) {
+      throw new IllegalArgumentException("app.maintenance.sla-hours must be positive: " + slaHours);
+    }
+  }
+
   public Duration sla() {
     return Duration.ofHours(slaHours);
   }

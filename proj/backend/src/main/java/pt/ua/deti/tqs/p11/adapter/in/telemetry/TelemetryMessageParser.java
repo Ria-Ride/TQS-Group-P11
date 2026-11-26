@@ -8,6 +8,7 @@ import pt.ua.deti.tqs.p11.application.telemetry.VehicleReading;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.GeoPosition;
 import pt.ua.deti.tqs.p11.domain.fleet.LockState;
+import pt.ua.deti.tqs.p11.domain.maintenance.FaultCode;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -27,7 +28,11 @@ public class TelemetryMessageParser {
   private static final Pattern TELEMETRY_TOPIC =
       Pattern.compile("^fleet/([^/]+)/vehicles/([^/]+)/telemetry$");
   private static final Pattern MAJOR_VERSION_1 = Pattern.compile("^1\\.\\d+\\.\\d+$");
-  private static final Pattern FAULT_CODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
+
+  /**
+   * The format of the core (UPPER_SNAKE_CASE, up to 64 characters), so FaultCode.of never fails.
+   */
+  private static final Pattern FAULT_CODE = Pattern.compile(FaultCode.FORMAT);
 
   private final String fleetId;
 
@@ -82,10 +87,16 @@ public class TelemetryMessageParser {
       throw invalid("hubId is not a valid identifier");
     }
     if (faultCode != null && !FAULT_CODE.matcher(faultCode).matches()) {
-      throw invalid("faultCode is not UPPER_SNAKE_CASE");
+      throw invalid("faultCode is not UPPER_SNAKE_CASE of up to 64 characters");
     }
     try {
-      return new VehicleReading(FleetCode.of(vehicleId), battery, lock, position, timestamp);
+      return new VehicleReading(
+          FleetCode.of(vehicleId),
+          battery,
+          lock,
+          position,
+          timestamp,
+          faultCode == null ? null : FaultCode.of(faultCode));
     } catch (IllegalArgumentException e) {
       throw invalid("vehicleId is not a valid identifier");
     }
