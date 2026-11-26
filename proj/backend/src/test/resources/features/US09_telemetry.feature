@@ -16,11 +16,13 @@ Feature: Telemetry updates the state of the vehicles (US09)
     And hub "hub-03" has capacity 10 and its only vehicle "bike-0001" is "Available"
     And an operator watches the fleet
 
+  @BR17
   Scenario: A valid reading updates battery, position and lock state
     When the simulator publishes a reading for "bike-0001" with battery 78.5%, lock state "unlocked" at "2026-11-10T10:00:00Z"
     Then vehicle "bike-0001" shows a battery of 78%
     And vehicle "bike-0001" shows lock state "UNLOCKED" and position 40.6405, -8.6538
 
+  @BR16
   Scenario: A reading does not change the lifecycle state of the vehicle
     When the simulator publishes a reading for "bike-0001" with battery 78.5%, lock state "locked" at "2026-11-10T10:00:00Z"
     Then vehicle "bike-0001" shows a battery of 78%
