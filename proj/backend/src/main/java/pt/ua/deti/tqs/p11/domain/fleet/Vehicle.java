@@ -181,6 +181,14 @@ public record Vehicle(
   }
 
   /**
+   * US04: the vehicle is handed to a tourist and leaves its hub. Whether it may be (battery, the
+   * booking rules) is checked by the caller on the locked vehicle.
+   */
+  public Vehicle startUse() {
+    return transition(VehicleAction.START_USE, hubId);
+  }
+
+  /**
    * Applies the lifecycle table. The vehicle is at hubAfter if the new state is at a hub, and at no
    * hub otherwise.
    */

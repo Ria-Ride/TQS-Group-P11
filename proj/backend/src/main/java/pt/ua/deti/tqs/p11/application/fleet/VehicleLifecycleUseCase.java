@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
@@ -93,6 +94,24 @@ public class VehicleLifecycleUseCase {
 
   public Vehicle retire(UUID vehicleId) {
     return change(vehicleId, Vehicle::retire);
+  }
+
+  /**
+   * US04: hands the vehicle to a booking, as one atomic change (K3). The vehicle is locked, then
+   * {@code check} runs on it as it is now (the booking rules: state, battery, overlap), then it
+   * goes from Available to InUse and the change is recorded. When called inside the booking's own
+   * transaction, the booking and the vehicle are committed together.
+   *
+   * @param check throws to refuse; nothing is saved or recorded then
+   */
+  public Vehicle startUse(UUID vehicleId, Consumer<Vehicle> check) {
+    Objects.requireNonNull(check, "check");
+    return change(
+        vehicleId,
+        vehicle -> {
+          check.accept(vehicle);
+          return vehicle.startUse();
+        });
   }
 
   public List<VehicleStateChange> history(UUID vehicleId) {

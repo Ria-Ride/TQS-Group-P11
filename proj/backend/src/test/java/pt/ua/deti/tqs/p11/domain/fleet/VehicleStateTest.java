@@ -8,13 +8,13 @@ import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.CONFIRM_ARRIVAL;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.DEACTIVATE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RETIRE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_MOVE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_USE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.AVAILABLE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.DEACTIVATED;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_TRANSIT;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_USE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.MAINTENANCE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.RETIRED;
-import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_USE;
-import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_USE;
 
 import java.util.Arrays;
 import java.util.List;
@@ -42,7 +42,6 @@ class VehicleStateTest {
           arguments(AVAILABLE, RETIRE, RETIRED),
           arguments(MAINTENANCE, RETIRE, RETIRED),
           arguments(AVAILABLE, START_USE, IN_USE));
-          
 
   static Stream<Arguments> allowedTransitions() {
     return ALLOWED.stream();

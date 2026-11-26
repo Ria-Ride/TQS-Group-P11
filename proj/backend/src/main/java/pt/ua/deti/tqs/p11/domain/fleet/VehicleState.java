@@ -30,6 +30,7 @@ public enum VehicleState {
       case START_MOVE -> to(IN_TRANSIT, action, EnumSet.of(AVAILABLE));
       case CONFIRM_ARRIVAL -> to(AVAILABLE, action, EnumSet.of(IN_TRANSIT));
       case RETIRE -> to(RETIRED, action, EnumSet.of(DEACTIVATED, AVAILABLE, MAINTENANCE));
+      case START_USE -> to(IN_USE, action, EnumSet.of(AVAILABLE));
     };
   }
 

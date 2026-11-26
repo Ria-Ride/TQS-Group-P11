@@ -320,7 +320,7 @@ class VehicleLifecycleUseCaseTest {
     assertThatThrownBy(() -> useCase.get(BIKE_ID)).isInstanceOf(VehicleNotFoundException.class);
   }
 
-    // ------------------------------------------------------------- start of a use (US04)
+  // ------------------------------------------------------------- start of a use (US04)
 
   /** K3: the booking's check and the change run on the locked vehicle, in one operation. */
   @Test
@@ -334,8 +334,7 @@ class VehicleLifecycleUseCaseTest {
     assertThat(vehicle.state()).isEqualTo(VehicleState.IN_USE);
     assertThat(vehicle.currentHub()).isEmpty();
     verify(history)
-        .save(
-            new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.IN_USE, T0));
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.IN_USE, T0));
   }
 
   @Test
@@ -357,9 +356,12 @@ class VehicleLifecycleUseCaseTest {
         .thenReturn(Optional.of(bikeAtHub03(VehicleState.AVAILABLE)));
     IllegalStateException refusal = new IllegalStateException("refused by the booking rules");
 
-    assertThatThrownBy(() -> useCase.startUse(BIKE_ID, locked -> {
-          throw refusal;
-        }))
+    assertThatThrownBy(() ->
+            useCase.startUse(
+                BIKE_ID,
+                locked -> {
+                  throw refusal;
+                }))
         .isSameAs(refusal);
     verify(vehicles, never()).save(any());
     verifyNoInteractions(history);

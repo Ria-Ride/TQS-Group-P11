@@ -60,8 +60,7 @@ class VehicleTest {
 
   @Test
   void startUse_availableVehicle_isInUseAndLeavesTheHub() {
-    Vehicle vehicle =
-        registeredAtHub03().activate().withBattery(BatteryLevel.of(80)).startUse();
+    Vehicle vehicle = registeredAtHub03().activate().withBattery(BatteryLevel.of(80)).startUse();
 
     assertThat(vehicle.state()).isEqualTo(VehicleState.IN_USE);
     assertThat(vehicle.currentHub()).isEmpty();
