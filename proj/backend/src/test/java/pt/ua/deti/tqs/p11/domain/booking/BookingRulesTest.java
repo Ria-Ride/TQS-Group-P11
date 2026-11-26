@@ -40,8 +40,7 @@ class BookingRulesTest {
 
   @Test
   void new_negativeStartWindow_isRefused() {
-    assertThatThrownBy(
-            () -> new BookingRules(DEPOSIT, Duration.ofMinutes(-1), GRACE, BLOCK, PRICE))
+    assertThatThrownBy(() -> new BookingRules(DEPOSIT, Duration.ofMinutes(-1), GRACE, BLOCK, PRICE))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

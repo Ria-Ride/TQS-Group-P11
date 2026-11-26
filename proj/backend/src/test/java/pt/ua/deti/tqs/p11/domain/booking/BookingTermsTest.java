@@ -39,15 +39,13 @@ class BookingTermsTest {
 
   @Test
   void new_endBeforeTheStart_isRefused() {
-    assertThatThrownBy(
-            () -> new BookingTerms(ANA, BIKE, PASS, HUB, START, START.minusSeconds(60)))
+    assertThatThrownBy(() -> new BookingTerms(ANA, BIKE, PASS, HUB, START, START.minusSeconds(60)))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void new_withoutAVehicle_isRefused() {
-    assertThatThrownBy(
-            () -> new BookingTerms(ANA, null, PASS, HUB, START, START.plusSeconds(60)))
+    assertThatThrownBy(() -> new BookingTerms(ANA, null, PASS, HUB, START, START.plusSeconds(60)))
         .isInstanceOf(NullPointerException.class);
   }
 }

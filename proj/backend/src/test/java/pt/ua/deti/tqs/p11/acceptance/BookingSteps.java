@@ -1,10 +1,13 @@
 package pt.ua.deti.tqs.p11.acceptance;
 
+import io.cucumber.java.Before;
 import io.cucumber.java.PendingException;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import java.math.BigDecimal;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Steps for US04 (KAN-56), run against the real API, database, MQTT broker and simulated payment
@@ -13,6 +16,17 @@ import java.math.BigDecimal;
  * PassPurchaseSteps, VehicleSearchSteps and FleetSteps.
  */
 public class BookingSteps {
+
+  @Autowired private JdbcTemplate jdbc;
+
+  /**
+   * Runs before every other cleaning hook: the ones that delete passes (order 9000), vehicles, hubs
+   * and users (default order), because bookings point to all of them.
+   */
+  @Before(order = 8000)
+  public void startWithNoBookings() {
+    jdbc.update("DELETE FROM bookings");
+  }
 
   // Given
 

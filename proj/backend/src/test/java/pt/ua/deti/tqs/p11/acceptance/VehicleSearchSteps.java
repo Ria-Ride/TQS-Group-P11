@@ -48,7 +48,7 @@ public class VehicleSearchSteps {
     return hubs.get(code);
   }
 
-    /**
+  /**
    * The operator that sets up hubs and vehicles. "a tourist is logged in" creates it; features that
    * log tourists in with other steps (US04) get one on first use, with its own email so it never
    * clashes with the accounts those steps register.

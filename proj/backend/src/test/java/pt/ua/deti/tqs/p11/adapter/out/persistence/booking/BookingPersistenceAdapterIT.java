@@ -179,10 +179,7 @@ class BookingPersistenceAdapterIT {
     bookings.save(second);
 
     assertThat(bookings.findById(first.id())).get().extracting(Booking::rules).isEqualTo(RULES);
-    assertThat(bookings.findById(second.id()))
-        .get()
-        .extracting(Booking::rules)
-        .isEqualTo(changed);
+    assertThat(bookings.findById(second.id())).get().extracting(Booking::rules).isEqualTo(changed);
   }
 
   // ------------------------------------------------------------- database rules
