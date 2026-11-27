@@ -12,6 +12,7 @@ import pt.ua.deti.tqs.p11.application.DirectTransactionRunner;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCommandPort;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
+import pt.ua.deti.tqs.p11.application.telemetry.FaultReportListener;
 
 /**
  * Commands to vehicles go over the same MQTT connection as telemetry when it is on; when it is off
@@ -24,6 +25,7 @@ class TelemetryConfigurationTest {
           .withUserConfiguration(TelemetryConfiguration.class)
           .withBean(VehicleRepository.class, () -> mock(VehicleRepository.class))
           .withBean(TransactionRunner.class, DirectTransactionRunner::new)
+          .withBean(FaultReportListener.class, () -> mock(FaultReportListener.class))
           .withBean(Clock.class, Clock::systemUTC);
 
   @Test
