@@ -57,6 +57,10 @@ class VehicleController {
           case START_MOVE -> vehicles.startMove(id);
           case CONFIRM_ARRIVAL -> vehicles.confirmArrival(id, request.hubId());
           case RETIRE -> vehicles.retire(id);
+          // US04: only a booking starts a use, after its deposit is held (BR11).
+          case START_USE ->
+              throw new InvalidFieldException(
+                  "action", "is started by a booking once its deposit is held, not by an operator");
           // BR18: a fault reaches Maintenance only with its ticket (telemetry or POST /tickets).
           case REPORT_FAULT ->
               throw new InvalidFieldException(
