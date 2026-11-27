@@ -1,7 +1,5 @@
 import { requestJson } from "./client";
 
-const NOT_IMPLEMENTED = "Not implemented yet (KAN-723)";
-
 export type TicketState = "OPEN" | "ASSIGNED" | "IN_PROGRESS" | "CLOSED" | "CANCELLED";
 
 /**
@@ -86,14 +84,25 @@ export interface TechnicianTicket {
   breached: boolean;
 }
 
-export function listMyTickets(_token: string): Promise<TechnicianTicket[]> {
-  throw new Error(NOT_IMPLEMENTED);
+/** US11: the caller's open tickets, nearest SLA deadline first. */
+export function listMyTickets(token: string): Promise<TechnicianTicket[]> {
+  return requestJson<TechnicianTicket[]>("/tickets/mine", { token });
 }
 
-export function startTicket(_ticketId: string, _token: string): Promise<Ticket> {
-  throw new Error(NOT_IMPLEMENTED);
+/** Refused with 403 for someone else's ticket and 409 for a ticket that is not Assigned. */
+export function startTicket(ticketId: string, token: string): Promise<Ticket> {
+  return requestJson<Ticket>(`/tickets/${encodeURIComponent(ticketId)}/start`, {
+    method: "POST",
+    body: {},
+    token,
+  });
 }
 
-export function closeTicket(_ticketId: string, _workDone: string, _token: string): Promise<Ticket> {
-  throw new Error(NOT_IMPLEMENTED);
+/** BR20: refused with 400 on workDone when blank, 409 when the work has not started. */
+export function closeTicket(ticketId: string, workDone: string, token: string): Promise<Ticket> {
+  return requestJson<Ticket>(`/tickets/${encodeURIComponent(ticketId)}/close`, {
+    method: "POST",
+    body: { workDone },
+    token,
+  });
 }

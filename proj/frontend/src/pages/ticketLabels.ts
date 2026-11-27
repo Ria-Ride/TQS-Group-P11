@@ -18,3 +18,10 @@ export const FAULT_COVERED = "This fault already has an open ticket.";
 export const VEHICLE_RETIRED = "This vehicle is retired.";
 export const NOT_A_TECHNICIAN = "Choose an active field technician.";
 export const WORK_STARTED = "Work on this ticket has started; it keeps its technician.";
+
+// US11: the field technician's page.
+export const NOT_THEIR_TICKET = "This ticket is assigned to another technician.";
+export const CANNOT_START = "This ticket cannot be started now.";
+export const WORK_DONE_MESSAGE = "Describe the work done.";
+export const NOT_STARTED = "Start the work before closing the ticket.";
+export const WORK_DONE_MAX = 1000;
