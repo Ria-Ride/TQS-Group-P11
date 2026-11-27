@@ -24,12 +24,15 @@ GET,/vehicle-types,N,Y,Y,Y,Y
 PATCH,/vehicle-types/{type},N,N,N,Y,Y
 GET,/usage-rules,N,Y,Y,Y,Y
 PUT,/usage-rules,N,N,N,Y,Y
+GET,/usage-rules/versions,N,N,N,Y,Y
 GET,/pass-types,N,Y,Y,Y,Y
 GET,/pass-types/{id}/price,N,Y,N,N,Y
 POST,/pass-types,N,N,N,Y,Y
 PATCH,/pass-types/{id},N,N,N,Y,Y
 GET,/stay-codes,N,N,N,Y,Y
 POST,/stay-codes,N,N,N,Y,Y
+GET,/partner-accommodations,N,N,N,Y,Y
+POST,/partner-accommodations,N,N,N,Y,Y
 GET,/passes,N,Y,N,N,Y
 POST,/passes,N,Y,N,N,Y
 GET,/bookings,N,Y,N,N,Y

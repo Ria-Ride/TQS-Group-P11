@@ -1,6 +1,9 @@
 package pt.ua.deti.tqs.p11.adapter.out.persistence.pass;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import pt.ua.deti.tqs.p11.application.pass.StayRepository;
 import pt.ua.deti.tqs.p11.domain.pass.Stay;
@@ -9,10 +12,17 @@ import pt.ua.deti.tqs.p11.domain.pass.Stay;
 @Component
 class StayPersistenceAdapter implements StayRepository {
 
-  private final SpringDataStayRepository repository;
+  private static final Sort NEWEST_FIRST =
+      Sort.by(Sort.Direction.DESC, "checkIn").and(Sort.by("code"));
 
-  StayPersistenceAdapter(SpringDataStayRepository repository) {
+  private final SpringDataStayRepository repository;
+  private final SpringDataPartnerAccommodationRepository accommodations;
+
+  StayPersistenceAdapter(
+      SpringDataStayRepository repository,
+      SpringDataPartnerAccommodationRepository accommodations) {
     this.repository = repository;
+    this.accommodations = accommodations;
   }
 
   @Override
@@ -37,5 +47,25 @@ class StayPersistenceAdapter implements StayRepository {
             .orElseThrow(() -> new IllegalStateException("No stay with id " + stay.id()));
     row.linkTo(stay.redeemedBy().orElse(null));
     repository.saveAndFlush(row);
+  }
+
+  @Override
+  public boolean existsByCode(String code) {
+    return repository.existsByCode(code.toUpperCase(Locale.ROOT));
+  }
+
+  @Override
+  public void add(Stay stay) {
+    PartnerAccommodationJpaEntity hotel =
+        accommodations
+            .findById(stay.accommodation().id())
+            .orElseThrow(
+                () -> new IllegalStateException("No hotel with id " + stay.accommodation().id()));
+    repository.saveAndFlush(StayJpaEntity.from(stay, hotel));
+  }
+
+  @Override
+  public List<Stay> findAll() {
+    return repository.findAll(NEWEST_FIRST).stream().map(StayJpaEntity::toDomain).toList();
   }
 }

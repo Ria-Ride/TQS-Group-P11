@@ -29,4 +29,15 @@ class PassTypePersistenceAdapter implements PassTypeRepository {
   public List<PassType> findAll() {
     return repository.findAll(SHORTEST_FIRST).stream().map(PassTypeJpaEntity::toDomain).toList();
   }
+
+  @Override
+  public boolean existsByCode(String code) {
+    return repository.existsByCode(code);
+  }
+
+  @Override
+  public PassType save(PassType passType) {
+    // Flush now, so a unique violation of the code surfaces here and not at some later commit.
+    return repository.saveAndFlush(PassTypeJpaEntity.from(passType)).toDomain();
+  }
 }

@@ -23,6 +23,14 @@ class PartnerAccommodationJpaEntity {
   /** For JPA only. */
   protected PartnerAccommodationJpaEntity() {}
 
+  static PartnerAccommodationJpaEntity from(PartnerAccommodation accommodation) {
+    PartnerAccommodationJpaEntity entity = new PartnerAccommodationJpaEntity();
+    entity.id = accommodation.id();
+    entity.name = accommodation.name();
+    entity.discountPercent = accommodation.discountPercent();
+    return entity;
+  }
+
   PartnerAccommodation toDomain() {
     return new PartnerAccommodation(id, name, discountPercent);
   }

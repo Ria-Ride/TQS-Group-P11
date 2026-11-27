@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.UUID;
+import java.util.function.Supplier;
 import pt.ua.deti.tqs.p11.domain.fleet.BatteryRule;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
@@ -19,12 +20,17 @@ public class VehicleSearchUseCase {
 
   private final HubRepository hubs;
   private final VehicleRepository vehicles;
-  private final BatteryRule rule;
+  private final Supplier<BatteryRule> rules;
 
-  public VehicleSearchUseCase(HubRepository hubs, VehicleRepository vehicles, BatteryRule rule) {
+  /**
+   * @param rules the battery rule in force, read at every search: the client manager can change it
+   *     (US14), and the next search must see the change
+   */
+  public VehicleSearchUseCase(
+      HubRepository hubs, VehicleRepository vehicles, Supplier<BatteryRule> rules) {
     this.hubs = Objects.requireNonNull(hubs, "hubs");
     this.vehicles = Objects.requireNonNull(vehicles, "vehicles");
-    this.rule = Objects.requireNonNull(rule, "rule");
+    this.rules = Objects.requireNonNull(rules, "rules");
   }
 
   /** Every vehicle at the hub, ordered by code, judged against the floor only. */
@@ -51,13 +57,14 @@ public class VehicleSearchUseCase {
     OptionalInt ride = minutes == null ? OptionalInt.empty() : OptionalInt.of(minutes);
     ride.ifPresent(BatteryRule::checkMinutes);
     hubs.findById(hubId).orElseThrow(() -> new HubNotFoundException(hubId));
+    BatteryRule rule = rules.get();
     return vehicles.findAtHub(hubId).stream()
         .filter(vehicle -> type == null || vehicle.type() == type)
-        .map(vehicle -> judged(vehicle, ride))
+        .map(vehicle -> judged(vehicle, rule, ride))
         .toList();
   }
 
-  private SearchedVehicle judged(Vehicle vehicle, OptionalInt ride) {
+  private static SearchedVehicle judged(Vehicle vehicle, BatteryRule rule, OptionalInt ride) {
     int required =
         ride.isPresent()
             ? rule.requiredPercent(vehicle.type(), ride.getAsInt())
