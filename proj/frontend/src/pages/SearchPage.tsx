@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
-import { listVehicleTypes, startRide, type Booking } from "../api/bookings";
+import { bookForLater, listVehicleTypes, startRide, type Booking } from "../api/bookings";
 import { ApiError } from "../api/client";
 import {
   listHubs,
@@ -9,6 +9,7 @@ import {
   type HubVehicle,
   type VehicleType,
 } from "../api/fleet";
+import { listPasses, type Pass } from "../api/passes";
 import { clearSession, loadSession } from "../auth/session";
 import { Logo } from "../components/Logo";
 import {
@@ -46,11 +47,36 @@ const START_MESSAGES = {
   pass: "You need a valid pass that allows this vehicle type.",
   booking: "You already have a ride in progress.",
   plannedEnd: "This ride is too long for the rules or for your pass. Choose a shorter one.",
+  plannedStart: "Choose a start time in the future.",
   402: "Your deposit was declined. No ride was started and nothing was held.",
   504: "The deposit did not answer in time. No ride was started; please try again.",
 } as const;
 
 const WHEN = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+/** US05: a ride for later must fit in one of the tourist's passes (BR4). */
+const NO_PASS_FOR_LATER = "You need a pass that is valid when the ride starts.";
+const LATER_OVERLAP = "You already have a booking in that period. Choose another time.";
+
+/** A Date as a datetime-local value ("YYYY-MM-DDTHH:mm") in the browser's zone. */
+function toLocalInput(at: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+    `T${pad(at.getHours())}:${pad(at.getMinutes())}`
+  );
+}
+
+/**
+ * The latest start that lets a ride of this length end inside one of the passes, or null when no
+ * pass covers a ride after now. The API stays the authority on the rules.
+ */
+function latestStart(passes: Pass[], rideMinutes: number, now: number): Date | null {
+  if (passes.length === 0) return null;
+  const lastEnd = Math.max(...passes.map((pass) => new Date(pass.validTo).getTime()));
+  const latest = lastEnd - rideMinutes * 60_000;
+  return latest > now ? new Date(latest) : null;
+}
 
 /** A refused start: what to tell the tourist, and what the page offers next. */
 interface StartError {
@@ -61,7 +87,7 @@ interface StartError {
   searchAgain: boolean;
 }
 
-function startError(failure: unknown): StartError {
+function startError(failure: unknown, later: boolean): StartError {
   const refusal = (message: string, buyPass = false, searchAgain = false): StartError => ({
     message,
     buyPass,
@@ -75,7 +101,8 @@ function startError(failure: unknown): StartError {
   if (failure.status === 504) return refusal(START_MESSAGES[504]);
   if ("vehicleId" in fields) return refusal(START_MESSAGES.vehicleId, false, true);
   if ("pass" in fields) return refusal(START_MESSAGES.pass, true);
-  if ("booking" in fields) return refusal(START_MESSAGES.booking);
+  if ("booking" in fields) return refusal(later ? LATER_OVERLAP : START_MESSAGES.booking);
+  if ("plannedStart" in fields) return refusal(START_MESSAGES.plannedStart);
   if ("plannedEnd" in fields) return refusal(START_MESSAGES.plannedEnd);
   return refusal(GENERIC_ERROR);
 }
@@ -101,6 +128,10 @@ interface StartedRide {
  * US04: selecting a bookable vehicle opens the start of a ride: its duration, the deposit of the
  * vehicle's type (shown before confirming, BR11) and a test card of the simulated gateway. The
  * rules are checked by the API; a refusal is explained in words for tourists.
+ *
+ * US05: the tourist can instead book the vehicle for later, picking the start; the picker is
+ * bounded by the end of the tourist's passes (BR4). The vehicle is then Reserved until it is
+ * started from My bookings in its window (BR7), cancelled, or expires.
  */
 export function SearchPage() {
   const navigate = useNavigate();
@@ -121,6 +152,10 @@ export function SearchPage() {
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<StartError | null>(null);
   const [ride, setRide] = useState<StartedRide | null>(null);
+  // US05: start now (US04) or book for a later period.
+  const [later, setLater] = useState(false);
+  const [startAt, setStartAt] = useState("");
+  const [passes, setPasses] = useState<Pass[] | null>(null);
 
   const token = session?.accessToken ?? null;
 
@@ -220,23 +255,49 @@ export function SearchPage() {
     setRefusal(null);
   }
 
+  /** US05: the passes bound a ride for later; read once, when the tourist first asks for one. */
+  function chooseLater() {
+    setLater(true);
+    if (token === null || passes !== null) return;
+    listPasses(token)
+      .then(setPasses)
+      .catch((failure: unknown) => {
+        if (failure instanceof ApiError && failure.status === 401) {
+          logInAgain();
+        } else {
+          setPasses([]);
+        }
+      });
+  }
+
+  const latest = passes === null ? null : latestStart(passes, rideMinutes, Date.now());
+  const noPassForLater = later && passes !== null && latest === null;
+
   async function start() {
     if (token === null || chosen === undefined) return;
     setBusy(true);
     setRefusal(null);
-    const plannedEnd = new Date(Date.now() + rideMinutes * 60_000).toISOString();
+    const startsAt = later ? new Date(startAt).getTime() : Date.now();
+    const plannedEnd = new Date(startsAt + rideMinutes * 60_000).toISOString();
     try {
-      const booking = await startRide(
-        { vehicleId: chosen.id, plannedEnd, paymentToken: card },
-        token,
-      );
+      const booking = later
+        ? await bookForLater(
+            {
+              vehicleId: chosen.id,
+              plannedStart: new Date(startsAt).toISOString(),
+              plannedEnd,
+              paymentToken: card,
+            },
+            token,
+          )
+        : await startRide({ vehicleId: chosen.id, plannedEnd, paymentToken: card }, token);
       setRide({ booking, vehicleCode: chosen.code });
     } catch (failure: unknown) {
       if (failure instanceof ApiError && failure.status === 401) {
         logInAgain();
         return;
       }
-      const refused = startError(failure);
+      const refused = startError(failure, later);
       setRefusal(refused);
       if (refused.searchAgain) {
         setSearchRound((round) => round + 1);
@@ -365,7 +426,33 @@ export function SearchPage() {
           </div>
         )}
 
-        {ride !== null && (
+        {ride !== null && ride.booking.state === "RESERVED" && (
+          <section aria-labelledby="ride-title" aria-live="polite">
+            <h2 id="ride-title">Your vehicle is reserved</h2>
+            <dl className="pass-details">
+              <dt>Vehicle</dt>
+              <dd>{ride.vehicleCode}</dd>
+              <dt>At hub</dt>
+              <dd>{startHub === undefined ? ride.booking.startHubId : hubLabel(startHub)}</dd>
+              <dt>Start between</dt>
+              <dd>
+                {WHEN.format(new Date(ride.booking.plannedStart))}
+                {ride.booking.startWindowEndsAt !== null &&
+                  ` and ${WHEN.format(new Date(ride.booking.startWindowEndsAt))}`}
+              </dd>
+              <dt>Planned end</dt>
+              <dd>{WHEN.format(new Date(ride.booking.plannedEnd))}</dd>
+              <dt>Deposit held</dt>
+              <dd>{`${ride.booking.deposit} ${ride.booking.currency}`}</dd>
+            </dl>
+            <p>
+              Start it at the hub from <Link to="/bookings">My bookings</Link>, or cancel it there
+              to get the whole deposit back.
+            </p>
+          </section>
+        )}
+
+        {ride !== null && ride.booking.state !== "RESERVED" && (
           <section aria-labelledby="ride-title" aria-live="polite">
             <h2 id="ride-title">Your ride has started</h2>
             <dl className="pass-details">
@@ -394,6 +481,46 @@ export function SearchPage() {
                 void start();
               }}
             >
+              <div className="field">
+                <span id="start-when-label" className="field-label">
+                  When
+                </span>
+                <div role="radiogroup" aria-labelledby="start-when-label" className="choice-list">
+                  <label className="choice">
+                    <input
+                      type="radio"
+                      name="start-when"
+                      checked={!later}
+                      onChange={() => setLater(false)}
+                    />
+                    <span>Now</span>
+                  </label>
+                  <label className="choice">
+                    <input type="radio" name="start-when" checked={later} onChange={chooseLater} />
+                    <span>Later</span>
+                  </label>
+                </div>
+              </div>
+
+              {later && (
+                <div className="field">
+                  <label htmlFor="start-at">Start at</label>
+                  <input
+                    id="start-at"
+                    type="datetime-local"
+                    value={startAt}
+                    min={toLocalInput(new Date(Date.now() + 60_000))}
+                    max={latest === null ? undefined : toLocalInput(latest)}
+                    onChange={(e) => setStartAt(e.target.value)}
+                  />
+                  {noPassForLater && (
+                    <p className="muted">
+                      {NO_PASS_FOR_LATER} <Link to="/passes/buy">Buy a pass</Link>
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="field">
                 <label htmlFor="start-duration">Ride duration</label>
                 <select
@@ -435,8 +562,14 @@ export function SearchPage() {
                 </div>
               </div>
 
-              <button type="submit" className="button" disabled={busy || deposit === undefined}>
-                Start ride
+              <button
+                type="submit"
+                className="button"
+                disabled={
+                  busy || deposit === undefined || (later && (startAt === "" || noPassForLater))
+                }
+              >
+                {later ? "Book for later" : "Start ride"}
               </button>
             </form>
           </section>

@@ -62,6 +62,11 @@ export function HomePage() {
               <Link className="button" to="/vehicles/search">
                 Find a vehicle
               </Link>
+              {profile.role === "END_USER" && (
+                <Link className="button" to="/bookings">
+                  My bookings
+                </Link>
+              )}
               {(profile.role === "OPERATOR" || profile.role === "ADMIN") && (
                 <Link className="button" to="/operator/fleet">
                   Manage fleet

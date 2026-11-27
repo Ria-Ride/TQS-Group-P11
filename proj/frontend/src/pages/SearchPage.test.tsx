@@ -1,19 +1,22 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
 import { listHubs, searchHubVehicles, type Hub, type HubVehicle } from "../api/fleet";
 import {
+  bookForLater,
   listVehicleTypes,
   startRide,
   type Booking,
   type VehicleTypeDeposit,
 } from "../api/bookings";
+import { listPasses, type Pass } from "../api/passes";
 import { loadSession, saveSession } from "../auth/session";
 import { renderApp } from "../test/renderApp";
 
 vi.mock("../api/fleet");
 vi.mock("../api/bookings");
+vi.mock("../api/passes");
 
 const TOKEN = "token-for-ana";
 const USER_ID = "4b1d6f2e-8a3c-4e5b-9d7f-1a2b3c4d5e6f";
@@ -66,7 +69,9 @@ function started(overrides: Partial<Booking> = {}): Booking {
     startHubId: hub03.id,
     plannedStart: "2026-11-26T10:00:00Z",
     plannedEnd: "2026-11-26T11:00:00Z",
+    startWindowEndsAt: null,
     startedAt: "2026-11-26T10:00:00Z",
+    cancelReason: null,
     deposit: "30.00",
     currency: "EUR",
     ...overrides,
@@ -93,6 +98,8 @@ beforeEach(() => {
   // Every search page reads the deposits when it opens.
   vi.mocked(listVehicleTypes).mockReset().mockResolvedValue(DEPOSITS);
   vi.mocked(startRide).mockReset();
+  vi.mocked(bookForLater).mockReset();
+  vi.mocked(listPasses).mockReset().mockResolvedValue([]);
   sessionStorage.clear();
 });
 
@@ -576,3 +583,105 @@ describe("starting a ride from the search (US04)", () => {
     expect(panel.getByRole("button", { name: "Start ride" })).toBeDisabled();
   });
 });
+
+describe("booking a vehicle for later (US05)", () => {
+  const MINUTE = 60_000;
+
+  /** A datetime-local value ("YYYY-MM-DDTHH:mm") in the browser's zone, as the picker uses. */
+  function localInput(at: Date): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return (
+      `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+      `T${pad(at.getHours())}:${pad(at.getMinutes())}`
+    );
+  }
+
+  function dayPass(validTo: Date): Pass {
+    return {
+      id: "pass-1",
+      passTypeId: "type-day",
+      passTypeCode: "DAY",
+      price: "10.00",
+      currency: "EUR",
+      validFrom: new Date(Date.now() - 60 * MINUTE).toISOString(),
+      validTo: validTo.toISOString(),
+    };
+  }
+
+  async function chooseLater(validTo = new Date(Date.now() + 20 * 60 * MINUTE)) {
+    const user = userEvent.setup();
+    vi.mocked(listPasses).mockResolvedValue([dayPass(validTo)]);
+    openSearch([hub03], [found("bike-0001")]);
+    await user.click((await row("bike-0001")).getByRole("button", { name: "Select" }));
+    await user.click(screen.getByRole("radio", { name: "Later" }));
+    return user;
+  }
+
+  it("books the vehicle for the chosen start, length and test card", async () => {
+    const user = await chooseLater();
+    const start = new Date(Date.now() + 2 * 60 * MINUTE);
+    start.setSeconds(0, 0);
+    vi.mocked(bookForLater).mockResolvedValue(
+      started({
+        state: "RESERVED",
+        startedAt: null,
+        plannedStart: start.toISOString(),
+        startWindowEndsAt: new Date(start.getTime() + 15 * MINUTE).toISOString(),
+      }),
+    );
+
+    fireEvent.change(await screen.findByLabelText("Start at"), {
+      target: { value: localInput(start) },
+    });
+    await user.click(screen.getByRole("button", { name: "Book for later" }));
+
+    expect(bookForLater).toHaveBeenCalledWith(
+      {
+        vehicleId: "id-bike-0001",
+        plannedStart: start.toISOString(),
+        plannedEnd: new Date(start.getTime() + 60 * MINUTE).toISOString(),
+        paymentToken: "tok_approve",
+      },
+      TOKEN,
+    );
+    expect(startRide).not.toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: "Your vehicle is reserved" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "My bookings" })).toHaveAttribute("href", "/bookings");
+  });
+
+  /** BR4: the latest start is the end of the tourist's last pass minus the ride. */
+  it("limits the start to the validity of the tourist's passes", async () => {
+    const validTo = new Date(Date.now() + 10 * 60 * MINUTE);
+    validTo.setSeconds(0, 0);
+    await chooseLater(validTo);
+
+    const startAt = await screen.findByLabelText("Start at");
+    expect(startAt).toHaveAttribute("max", localInput(new Date(validTo.getTime() - 60 * MINUTE)));
+  });
+
+  it("offers to buy a pass when no pass covers a later ride", async () => {
+    vi.mocked(listPasses).mockResolvedValue([]);
+    const user = userEvent.setup();
+    openSearch([hub03], [found("bike-0001")]);
+    await user.click((await row("bike-0001")).getByRole("button", { name: "Select" }));
+    await user.click(screen.getByRole("radio", { name: "Later" }));
+
+    expect(await screen.findByText("You need a pass that is valid when the ride starts.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Book for later" })).toBeDisabled();
+  });
+
+  it("explains a start that the API does not accept as in the future", async () => {
+    const user = await chooseLater();
+    vi.mocked(bookForLater).mockRejectedValue(
+      new ApiError(400, { plannedStart: "must be in the future" }),
+    );
+
+    fireEvent.change(await screen.findByLabelText("Start at"), {
+      target: { value: localInput(new Date(Date.now() + 2 * 60 * MINUTE)) },
+    });
+    await user.click(screen.getByRole("button", { name: "Book for later" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Choose a start time in the future.");
+  });
+});
+

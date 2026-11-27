@@ -421,3 +421,16 @@ a:hover {
 .pass-details dd {
   margin: 0;
 }
+
+/* US05: one booking in My bookings. */
+.booking-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 0 0 16px;
+}
+
+.booking-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
