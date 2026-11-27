@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
+import { listVehicleTypes, startRide, type Booking } from "../api/bookings";
 import { ApiError } from "../api/client";
 import {
   listHubs,
@@ -18,17 +19,88 @@ import {
   VEHICLE_TYPES,
 } from "./fleetLabels";
 import { GENERIC_ERROR } from "./messages";
+import { TEST_CARDS } from "./testCards";
 
 type PageState = "loading" | "ready" | "error";
 
 const NO_HUBS = "There are no hubs yet.";
 const NOTHING_TO_BOOK = "No vehicle is available at this hub right now.";
+const DEPOSITS_UNKNOWN = "The deposit cannot be shown right now. Please try again later.";
+
+/**
+ * How long a ride can be planned for (BR5: at most 4 hours by default). The server stays the
+ * authority: a ride it refuses is explained to the tourist.
+ */
+const START_LENGTHS: { minutes: number; label: string }[] = [
+  { minutes: 30, label: "30 minutes" },
+  { minutes: 60, label: "1 hour" },
+  { minutes: 120, label: "2 hours" },
+  { minutes: 180, label: "3 hours" },
+  { minutes: 240, label: "4 hours" },
+];
+const DEFAULT_START_MINUTES = 60;
+
+/** The backend's refusals of a start (US04), written for tourists. */
+const START_MESSAGES = {
+  vehicleId: "This vehicle was just taken or cannot do this ride. Choose another one.",
+  pass: "You need a valid pass that allows this vehicle type.",
+  booking: "You already have a ride in progress.",
+  plannedEnd: "This ride is too long for the rules or for your pass. Choose a shorter one.",
+  402: "Your deposit was declined. No ride was started and nothing was held.",
+  504: "The deposit did not answer in time. No ride was started; please try again.",
+} as const;
+
+const WHEN = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+/** A refused start: what to tell the tourist, and what the page offers next. */
+interface StartError {
+  message: string;
+  /** No valid pass for this vehicle: offer to buy one. */
+  buyPass: boolean;
+  /** The vehicle may have just been taken: search the hub again. */
+  searchAgain: boolean;
+}
+
+function startError(failure: unknown): StartError {
+  const refusal = (message: string, buyPass = false, searchAgain = false): StartError => ({
+    message,
+    buyPass,
+    searchAgain,
+  });
+  if (!(failure instanceof ApiError)) {
+    return refusal(GENERIC_ERROR);
+  }
+  const fields = failure.fieldErrors;
+  if (failure.status === 402) return refusal(START_MESSAGES[402]);
+  if (failure.status === 504) return refusal(START_MESSAGES[504]);
+  if ("vehicleId" in fields) return refusal(START_MESSAGES.vehicleId, false, true);
+  if ("pass" in fields) return refusal(START_MESSAGES.pass, true);
+  if ("booking" in fields) return refusal(START_MESSAGES.booking);
+  if ("plannedEnd" in fields) return refusal(START_MESSAGES.plannedEnd);
+  return refusal(GENERIC_ERROR);
+}
+
+/** The ride length picked in the search, if the start offers it; otherwise one hour. */
+function startLengthFor(minutes: number | null): number {
+  return START_LENGTHS.some((option) => option.minutes === minutes)
+    ? (minutes as number)
+    : DEFAULT_START_MINUTES;
+}
+
+/** A started ride and the code of its vehicle, to show it to the tourist. */
+interface StartedRide {
+  booking: Booking;
+  vehicleCode: string;
+}
 
 /**
  * US02: a tourist picks a hub, optionally a vehicle type and the length of the ride, and sees the
  * vehicles of the hub with their battery. A vehicle that cannot be booked (BR1, BR2) is listed with
  * the reason and cannot be selected. Which vehicles can be booked is decided by the API, not here.
- * Booking itself comes with US04, so selecting only marks the vehicle for now.
+ *
+ * US04: selecting a bookable vehicle opens the start of a ride: its duration, the deposit of the
+ * vehicle's type (shown before confirming, BR11) and a test card of the simulated gateway. The
+ * rules are checked by the API; a refusal is explained in words for tourists.
  */
 export function SearchPage() {
   const navigate = useNavigate();
@@ -40,19 +112,32 @@ export function SearchPage() {
   const [minutes, setMinutes] = useState<number | null>(null);
   const [vehicles, setVehicles] = useState<HubVehicle[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [searchRound, setSearchRound] = useState(0);
+
+  const [deposits, setDeposits] = useState<Partial<Record<VehicleType, string>> | null>(null);
+  const [depositsFailed, setDepositsFailed] = useState(false);
+  const [rideMinutes, setRideMinutes] = useState(DEFAULT_START_MINUTES);
+  const [card, setCard] = useState<string>(TEST_CARDS[0].token);
+  const [busy, setBusy] = useState(false);
+  const [refusal, setRefusal] = useState<StartError | null>(null);
+  const [ride, setRide] = useState<StartedRide | null>(null);
 
   const token = session?.accessToken ?? null;
+
+  const logInAgain = useCallback(() => {
+    clearSession(); // expired, invalid or deactivated
+    navigate("/login", { replace: true });
+  }, [navigate]);
 
   const handleFailure = useCallback(
     (failure: unknown) => {
       if (failure instanceof ApiError && failure.status === 401) {
-        clearSession(); // expired, invalid or deactivated
-        navigate("/login", { replace: true });
+        logInAgain();
       } else {
         setState("error");
       }
     },
-    [navigate],
+    [logInAgain],
   );
 
   // The hubs to choose from.
@@ -74,8 +159,35 @@ export function SearchPage() {
     };
   }, [token, handleFailure]);
 
-  // The vehicles of the chosen hub, again whenever a choice changes. A late answer to an older
-  // choice is ignored, so the list always matches what is selected on the page.
+  // The deposit of each vehicle type, to show it before a ride is started (BR11). Without it the
+  // search still works, but no ride can be started.
+  useEffect(() => {
+    if (token === null) return;
+    let active = true;
+    listVehicleTypes(token)
+      .then((types) => {
+        if (!active) return;
+        const byType: Partial<Record<VehicleType, string>> = {};
+        for (const vehicleType of types) {
+          byType[vehicleType.type] = `${vehicleType.deposit} ${vehicleType.currency}`;
+        }
+        setDeposits(byType);
+      })
+      .catch((failure: unknown) => {
+        if (!active) return;
+        if (failure instanceof ApiError && failure.status === 401) {
+          logInAgain();
+        } else {
+          setDepositsFailed(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, logInAgain]);
+
+  // The vehicles of the chosen hub, again whenever a choice changes or a start asks for a fresh
+  // search. A late answer to an older choice is ignored, so the list always matches the page.
   useEffect(() => {
     if (token === null || hubId === "") return;
     let active = true;
@@ -92,13 +204,50 @@ export function SearchPage() {
     return () => {
       active = false;
     };
-  }, [token, hubId, type, minutes, handleFailure]);
+  }, [token, hubId, type, minutes, searchRound, handleFailure]);
 
   if (session === null) {
     return <Navigate to="/login" replace />;
   }
 
   const nothingToBook = state === "ready" && !vehicles.some((vehicle) => vehicle.bookable);
+  const chosen = vehicles.find((vehicle) => vehicle.id === selected);
+  const deposit = chosen === undefined ? undefined : deposits?.[chosen.type];
+
+  function choose(vehicleId: string) {
+    setSelected(vehicleId);
+    setRideMinutes(startLengthFor(minutes));
+    setRefusal(null);
+  }
+
+  async function start() {
+    if (token === null || chosen === undefined) return;
+    setBusy(true);
+    setRefusal(null);
+    const plannedEnd = new Date(Date.now() + rideMinutes * 60_000).toISOString();
+    try {
+      const booking = await startRide(
+        { vehicleId: chosen.id, plannedEnd, paymentToken: card },
+        token,
+      );
+      setRide({ booking, vehicleCode: chosen.code });
+    } catch (failure: unknown) {
+      if (failure instanceof ApiError && failure.status === 401) {
+        logInAgain();
+        return;
+      }
+      const refused = startError(failure);
+      setRefusal(refused);
+      if (refused.searchAgain) {
+        setSearchRound((round) => round + 1);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const startHub =
+    ride === null ? undefined : hubs.find((hub) => hub.id === ride.booking.startHubId);
 
   return (
     <main className="page">
@@ -193,7 +342,7 @@ export function SearchPage() {
                         className="button button-small"
                         disabled={!vehicle.bookable}
                         aria-pressed={selected === vehicle.id}
-                        onClick={() => setSelected(vehicle.id)}
+                        onClick={() => choose(vehicle.id)}
                       >
                         {selected === vehicle.id ? "Selected" : "Select"}
                       </button>
@@ -205,10 +354,92 @@ export function SearchPage() {
           </div>
         )}
 
-        {selected !== null && (
-          <p aria-live="polite">
-            Selected: {vehicles.find((vehicle) => vehicle.id === selected)?.code}
-          </p>
+        {refusal !== null && (
+          <div role="alert" className="form-error">
+            <p>{refusal.message}</p>
+            {refusal.buyPass && (
+              <Link className="button button-small" to="/passes/buy">
+                Buy a pass
+              </Link>
+            )}
+          </div>
+        )}
+
+        {ride !== null && (
+          <section aria-labelledby="ride-title" aria-live="polite">
+            <h2 id="ride-title">Your ride has started</h2>
+            <dl className="pass-details">
+              <dt>Vehicle</dt>
+              <dd>{ride.vehicleCode}</dd>
+              <dt>From hub</dt>
+              <dd>{startHub === undefined ? ride.booking.startHubId : hubLabel(startHub)}</dd>
+              <dt>Planned end</dt>
+              <dd>{WHEN.format(new Date(ride.booking.plannedEnd))}</dd>
+              <dt>Deposit held</dt>
+              <dd>{`${ride.booking.deposit} ${ride.booking.currency}`}</dd>
+            </dl>
+            <p>The vehicle is being unlocked.</p>
+          </section>
+        )}
+
+        {ride === null && chosen !== undefined && (
+          <section aria-labelledby="start-title">
+            <h2 id="start-title">Start a ride</h2>
+            <p aria-live="polite">Selected: {chosen.code}</p>
+            <form
+              className="form"
+              aria-label="Start a ride"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void start();
+              }}
+            >
+              <div className="field">
+                <label htmlFor="start-duration">Ride duration</label>
+                <select
+                  id="start-duration"
+                  value={String(rideMinutes)}
+                  onChange={(e) => setRideMinutes(Number(e.target.value))}
+                >
+                  {START_LENGTHS.map((option) => (
+                    <option key={option.minutes} value={option.minutes}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {deposit !== undefined && <p>Deposit held during the ride: {deposit}</p>}
+              {deposit === undefined && depositsFailed && <p className="muted">{DEPOSITS_UNKNOWN}</p>}
+
+              <div className="field">
+                <span id="start-card-label" className="field-label">
+                  Test card
+                </span>
+                <p className="muted">
+                  This is a simulated deposit: no real money is held. Choose how the bank answers.
+                </p>
+                <div role="radiogroup" aria-labelledby="start-card-label" className="choice-list">
+                  {TEST_CARDS.map((option) => (
+                    <label key={option.token} className="choice">
+                      <input
+                        type="radio"
+                        name="start-card"
+                        value={option.token}
+                        checked={option.token === card}
+                        onChange={() => setCard(option.token)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <button type="submit" className="button" disabled={busy || deposit === undefined}>
+                Start ride
+              </button>
+            </form>
+          </section>
         )}
       </section>
     </main>

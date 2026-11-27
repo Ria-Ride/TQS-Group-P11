@@ -97,6 +97,12 @@ a reading is only applied to a vehicle the platform knows.
 | `APP_DEMO_SEED_FLEET` | `false` (Compose: `true`) | Register the simulator's hubs and vehicles at start-up. Set both this and `APP_TELEMETRY_ENABLED` to `false` in `.env` for a run that must start with an empty fleet |
 | `SIMULATOR_VERSION`, `SIMULATOR_SCENARIO_FILE` | `1.0.0`, `ria-ride.yml` | Which simulator release and scenario Compose runs |
 
+**Commands to vehicles (US04).** When a ride starts, the backend sends the vehicle an `unlock`
+command on `fleet/{fleetId}/vehicles/{vehicleId}/commands/unlock` (QoS 1, not retained), as in the
+simulator contract, over the same MQTT connection as telemetry. It does not wait for the answer.
+Each command carries an `expiresAt`, `app.telemetry.command-ttl` after it is sent (default `PT30S`),
+so a command delayed in the broker is rejected by the vehicle instead of applied late. With
+telemetry off, commands are only logged and rides still start.
 ### Maintenance tickets
 
 A reading with a fault code opens a maintenance ticket (US10), due 24 hours later, and an Available
@@ -198,15 +204,49 @@ Each returns `{ "id", "name", "email", "role", "fieldTechnician", "active" }`. O
 can be a field technician (BR20, also enforced by a database constraint). Admin accounts cannot be
 created, changed or deactivated through the API.
 
+### Bookings (US04)
+
+| Endpoint | Body | Success | Errors |
+| --- | --- | --- | --- |
+| `POST /bookings` | `vehicleId`, `plannedEnd` (UTC instant), `paymentToken` | `201` with the Active booking and `Location: /bookings/{id}` | `400` on `plannedEnd` (not after now, above the longest booking, or after the end of the Pass) or a missing field; `402` on `deposit` (declined); `404` unknown vehicle; `409` on `vehicleId` (not available, not enough battery), `pass` (no valid Pass for the type) or `booking` (another ride in progress); `504` on `deposit` (no answer in time) |
+| `GET /vehicle-types` | — | `200` with each vehicle type, its `deposit` and `currency` | — |
+
+`POST /bookings` is for `END_USER` (and `ADMIN`); the booking is always the caller's. It starts a
+ride now, in this order: the rules of use are checked (BR1, BR2, BR4 to BR6); the deposit of the
+vehicle's type is held at the payment gateway (BR11); then, in one transaction, the account and the
+vehicle are locked, the rules are checked again, the vehicle goes InUse and the booking is stored
+with a copy of the rules in force (BR21). A refused or failed start keeps no deposit. Of several
+simultaneous requests for one vehicle exactly one succeeds (BR3); see "Concurrency" in
+[`docs/architecture.md`](docs/architecture.md). The vehicle is then asked to unlock.
+
+The returned booking has `id`, `state`, `vehicleId`, `passId`, `startHubId`, `plannedStart`,
+`plannedEnd`, `startedAt`, `deposit` and `currency`.
+
+**Rules of use** (until the client edits them in US14) are set in `application.properties`:
+
+| Property | Default | Rule |
+| --- | --- | --- |
+| `app.booking.max-duration` | `PT4H` | BR5: the longest booking (above 0, at most 24 h) |
+| `app.booking.deposit.e-bike`, `app.booking.deposit.e-scooter` | `30.00`, `50.00` | BR11: deposit per vehicle type, in euros |
+| `app.booking.start-window` | `PT15M` | BR7 (US05): how long after its planned start a reservation can be started |
+| `app.booking.overtime-grace`, `app.booking.overtime-block`, `app.booking.overtime-price-per-block` | `PT10M`, `PT15M`, `2.00` | BR12 (US06): overtime charge |
+
+The payment gateway simulates deposits too: `POST /authorizations` holds an amount,
+`/authorizations/{key}/capture` takes part of it and gives the rest back, and
+`/authorizations/{key}/release` gives it all back. The test card decides the answer
+(`tok_approve`, `tok_decline`, `tok_timeout`, which holds the amount but answers late).
+
 ## Frontend
 
 React + Vite + TypeScript with React Router. Pages: guest registration (`/register`),
-login (`/login`), home (`/`, requires a session) and account management (`/admin/users`, for
+login (`/login`), home (`/`, requires a session), account management (`/admin/users`, for
 admins only: list, create, change role, activate or deactivate; the home page links to it for
-admins). It uses the Ria Ride palette and the Outfit
-font (served from our own origin with Fontsource). The colours are CSS variables in
-`proj/frontend/src/styles/theme.css`, checked for WCAG AA contrast. The access token is kept in
-`sessionStorage` for as long as the tab is open.
+admins), pass purchase (`/passes/buy`) and vehicle search (`/vehicles/search`). On the search
+page a tourist selects a bookable vehicle and starts a ride: ride duration, the deposit of the
+vehicle's type (shown before confirming) and a test card; refusals are explained in words for
+tourists. It uses the Ria Ride palette and the Outfit font (served from our own origin with
+Fontsource). The colours are CSS variables in `proj/frontend/src/styles/theme.css`, checked for
+WCAG AA contrast. The access token is kept in `sessionStorage` for as long as the tab is open.
 
 ## Contributing
 

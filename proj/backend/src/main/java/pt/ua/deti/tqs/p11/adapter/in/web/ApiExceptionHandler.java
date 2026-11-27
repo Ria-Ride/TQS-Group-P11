@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.auth.InvalidCredentialsException;
+import pt.ua.deti.tqs.p11.application.booking.DepositDeclinedException;
+import pt.ua.deti.tqs.p11.application.booking.DepositTimedOutException;
 import pt.ua.deti.tqs.p11.application.fleet.HubCodeAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.fleet.HubNotFoundException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
@@ -31,6 +33,7 @@ import pt.ua.deti.tqs.p11.application.pass.UnknownPassTypeException;
 import pt.ua.deti.tqs.p11.application.pass.UnknownStayCodeException;
 import pt.ua.deti.tqs.p11.application.rules.RulesVersionConflictException;
 import pt.ua.deti.tqs.p11.application.user.UserNotFoundException;
+import pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException;
 import pt.ua.deti.tqs.p11.domain.fleet.CapacityBelowVehiclesHeldException;
 import pt.ua.deti.tqs.p11.domain.fleet.ForbiddenTransitionException;
 import pt.ua.deti.tqs.p11.domain.fleet.HubFullException;
@@ -51,6 +54,7 @@ class ApiExceptionHandler {
   private static final String INVALID_FIELDS = "The request has invalid fields";
   private static final String STAY_CODE = "stayCode";
   private static final String PAYMENT = "payment";
+  private static final String DEPOSIT = "deposit";
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   ProblemDetail invalidRequest(MethodArgumentNotValidException e) {
@@ -216,6 +220,60 @@ class ApiExceptionHandler {
   @ExceptionHandler({ForbiddenTransitionException.class, VehicleHasOpenTicketException.class})
   ProblemDetail transitionRefused(RuntimeException e) {
     return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("action", e.getMessage()));
+  }
+
+  // US04: a refused booking. One status and one field per rule, so the client shows it in place.
+
+  /** How one refused rule is told to the client. */
+  private record Refusal(HttpStatus status, String field, String message) {}
+
+  /**
+   * BR1 to BR6. A field the tourist can correct is 400; a conflict with the state of the fleet, the
+   * Pass or the tourist's bookings is 409. A switch with no default, so a new rule does not compile
+   * until it is mapped here.
+   */
+  @ExceptionHandler(BookingRefusedException.class)
+  ProblemDetail bookingRefused(BookingRefusedException e) {
+    Refusal refusal =
+        switch (e.reason()) {
+          case DURATION_NOT_ALLOWED ->
+              new Refusal(
+                  HttpStatus.BAD_REQUEST,
+                  "plannedEnd",
+                  "must be after now and within the longest booking allowed");
+          case RIDE_ENDS_AFTER_PASS ->
+              new Refusal(HttpStatus.BAD_REQUEST, "plannedEnd", "is after the end of your pass");
+          case VEHICLE_NOT_AVAILABLE ->
+              new Refusal(HttpStatus.CONFLICT, "vehicleId", "is not available");
+          case NOT_ENOUGH_BATTERY ->
+              new Refusal(HttpStatus.CONFLICT, "vehicleId", "has not enough battery for this ride");
+          case NO_VALID_PASS -> new Refusal(HttpStatus.CONFLICT, "pass", "you have no valid pass");
+          case PASS_DOES_NOT_ALLOW_TYPE ->
+              new Refusal(
+                  HttpStatus.CONFLICT, "pass", "your pass does not allow this vehicle type");
+          case OVERLAPPING_BOOKING ->
+              new Refusal(
+                  HttpStatus.CONFLICT, "booking", "you already have a booking in that period");
+        };
+    String detail =
+        refusal.status() == HttpStatus.BAD_REQUEST ? INVALID_FIELDS : "The booking is refused";
+    return problem(refusal.status(), detail, Map.of(refusal.field(), refusal.message()));
+  }
+
+  /** BR11: not held, so no booking. The gateway's reason is not shown to the client. */
+  @ExceptionHandler(DepositDeclinedException.class)
+  ProblemDetail depositDeclined(DepositDeclinedException e) {
+    return problem(
+        HttpStatus.PAYMENT_REQUIRED, "The deposit was declined", Map.of(DEPOSIT, "was declined"));
+  }
+
+  /** BR11: no answer in time, so no booking; the deposit was released. Trying again is safe. */
+  @ExceptionHandler(DepositTimedOutException.class)
+  ProblemDetail depositTimedOut(DepositTimedOutException e) {
+    return problem(
+        HttpStatus.GATEWAY_TIMEOUT,
+        "The deposit got no answer in time",
+        Map.of(DEPOSIT, "got no answer in time; try again"));
   }
 
   // US10: maintenance tickets.

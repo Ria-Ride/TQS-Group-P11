@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 /**
  * Simulated payment gateway (KAN-96). It holds no real money and no card data: the token in each
  * request is a test card that decides the answer, like the test cards of real payment sandboxes.
- * Charges are kept in memory and lost on restart.
+ * Charges and deposits are kept in memory and lost on restart.
  */
 @SpringBootApplication
 @ConfigurationPropertiesScan

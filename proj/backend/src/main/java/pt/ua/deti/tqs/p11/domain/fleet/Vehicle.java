@@ -181,6 +181,14 @@ public record Vehicle(
   }
 
   /**
+   * US04: the vehicle is handed to a tourist and leaves its hub. Whether it may be (battery, the
+   * booking rules) is checked by the caller on the locked vehicle.
+   */
+  public Vehicle startUse() {
+    return transition(VehicleAction.START_USE, hubId);
+  }
+
+  /**
    * BR18: a fault sends an Available or Reserved vehicle to maintenance, at the same hub. In any
    * other state the vehicle is kept as it is: an InUse ride is not interrupted, and a vehicle that
    * is not offered stays out of service. The fault itself is recorded by its ticket.

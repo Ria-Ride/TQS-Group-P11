@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.config;
 
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -11,6 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param username empty to connect without authentication
  * @param clientId empty to generate a unique one at start-up
  * @param fleetId the only fleet the platform listens to (simulator contract identifier)
+ * @param commandTtl how long a command to a vehicle stays valid after it is sent (its expiresAt)
  */
 @ConfigurationProperties("app.telemetry")
 public record TelemetryProperties(
@@ -20,4 +22,5 @@ public record TelemetryProperties(
     @DefaultValue("") String username,
     @DefaultValue("") String password,
     @DefaultValue("") String clientId,
-    @DefaultValue("fleet-01") String fleetId) {}
+    @DefaultValue("fleet-01") String fleetId,
+    @DefaultValue("PT30S") Duration commandTtl) {}

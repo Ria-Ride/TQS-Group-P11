@@ -234,6 +234,46 @@ sequenceDiagram
 
 Persistence calls are omitted for readability; every module stores its own state through repository ports.
 
+### Concurrency: one booking per vehicle (BR3)
+
+Several tourists may ask for the same vehicle at the same moment, and one tourist may send two
+requests at once (K3). Exactly one booking may win, and every request that loses must give back the
+deposit it held (BR11, BR13).
+
+**Mechanism: pessimistic locks on the rows that decide, plus a database constraint as a safety net.**
+
+1. The booking rules are checked first without locks, so most refusals cost nothing and hold no
+   money.
+2. The deposit is authorized outside any transaction, so no database lock is held while waiting for
+   the gateway (up to the read timeout).
+3. In one transaction, the account and then the vehicle are locked (`SELECT ... FOR UPDATE`), the
+   rules are checked again on the locked rows, the vehicle goes InUse through the Fleet module, and
+   the booking and its deposit are stored. A second request for the same vehicle waits on the
+   vehicle lock, then finds it InUse and is refused; a second request of the same tourist waits on
+   the account lock, then finds the first ride and is refused (BR6).
+4. A request refused on the locked rows releases its deposit.
+
+**Lock order.** Always account, then vehicle, then hub (US08 already locks vehicle before hub). No
+operation takes them in another order, so two operations never wait for each other (no deadlock).
+
+**Safety net.** A partial unique index allows one Reserved or Active booking per vehicle
+(`uk_bookings_ongoing_vehicle`). Through the use case it is never reached; if a future path forgets
+the lock, the database still refuses, and the adapter reports it as "vehicle not available", the
+same refusal the losers of a race get.
+
+**Alternatives considered.**
+
+| Option | Why not chosen |
+|--------|----------------|
+| Optimistic locking (`@Version` on the vehicle) | Under a burst of requests most of them fail at commit and would have to retry or report a generic conflict; telemetry also writes the vehicle, so readings would make bookings fail. The pessimistic lock makes losers wait a few milliseconds and get the real reason |
+| Database constraint only | Prevents two bookings, but the vehicle state change and the booking would be checked separately, and the loser would learn it only from a constraint error after its vehicle change |
+| Application lock (`synchronized`, a map of locks) | Holds only inside one backend instance; the database lock also holds with several instances |
+
+**Evidence.** `BookingApiIT` (real PostgreSQL): 2 and 10 simultaneous requests for one vehicle give
+exactly one booking and one held deposit; the 10-request race runs 5 times on every build. One
+tourist starting two vehicles at once rides one. The US04 Gherkin scenario runs the same race
+through Cucumber.
+
 ### External integrations
 
 | Integration | Interface (port) | Protocol | Adapter | How it is tested |

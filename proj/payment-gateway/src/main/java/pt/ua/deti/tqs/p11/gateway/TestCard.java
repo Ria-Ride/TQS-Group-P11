@@ -7,7 +7,10 @@ import java.util.Optional;
 enum TestCard {
   APPROVE("tok_approve"),
   DECLINE("tok_decline"),
-  /** Declined, but only after the configured delay, so the caller times out first. */
+  /**
+   * Answers only after the configured delay, so the caller times out first: a charge is declined,
+   * a deposit is held (the worst case of a real gateway).
+   */
   TIMEOUT("tok_timeout");
 
   private final String token;

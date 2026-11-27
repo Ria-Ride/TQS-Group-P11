@@ -48,13 +48,32 @@ public class VehicleSearchSteps {
     return hubs.get(code);
   }
 
+  /**
+   * The operator that sets up hubs and vehicles. "a tourist is logged in" creates it; features that
+   * log tourists in with other steps (US04) get one on first use, with its own email so it never
+   * clashes with the accounts those steps register.
+   */
+  private FleetApi operator() {
+    if (operator == null) {
+      operator = newOperator(ApiClient.forPort(port), "Fleet Setup", "fleet.setup@example.com");
+    }
+    return operator;
+  }
+
+  /** Roles are set in the database and read on every request, so the token works right away. */
+  private FleetApi newOperator(RestClient http, String name, String email) {
+    Registered account = ApiClient.registerGuest(http, name, email, "Passw0rd!");
+    jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE id = ?", account.id());
+    return new FleetApi(http, account.token());
+  }
+
   private void setBattery(String vehicleCode, Integer percent) {
     jdbc.update("UPDATE vehicles SET battery_percent = ? WHERE code = ?", percent, vehicleCode);
   }
 
   private void availableVehicle(String code, String type, String hubCode, Integer battery) {
-    UUID id = FleetApi.id(FleetApi.created(operator.registerVehicle(code, type, hub(hubCode))));
-    assertThat(operator.transition(id, "ACTIVATE").getStatusCode())
+    UUID id = FleetApi.id(FleetApi.created(operator().registerVehicle(code, type, hub(hubCode))));
+    assertThat(operator().transition(id, "ACTIVATE").getStatusCode())
         .as("setup: activate %s", code)
         .isEqualTo(HttpStatus.OK);
     setBattery(code, battery);
@@ -79,11 +98,7 @@ public class VehicleSearchSteps {
   @Given("a tourist is logged in")
   public void aTouristIsLoggedIn() {
     RestClient http = ApiClient.forPort(port);
-    Registered rui =
-        ApiClient.registerGuest(http, "Rui Costa", "rui.costa@example.com", "Passw0rd!");
-    // Roles are set in the database and read on every request, so the token works right away.
-    jdbc.update("UPDATE users SET role = 'OPERATOR' WHERE id = ?", rui.id());
-    operator = new FleetApi(http, rui.token());
+    operator = newOperator(http, "Rui Costa", "rui.costa@example.com");
     Registered ana =
         ApiClient.registerGuest(http, "Ana Lopes", "ana.lopes@example.com", "Passw0rd!");
     tourist = new FleetApi(http, ana.token());
@@ -91,7 +106,7 @@ public class VehicleSearchSteps {
 
   @Given("hub {string} exists")
   public void hubExists(String code) {
-    hubs.put(code, operator.hub(code, 10));
+    hubs.put(code, operator().hub(code, 10));
   }
 
   @Given("hub {string} holds these available vehicles:")
@@ -110,7 +125,7 @@ public class VehicleSearchSteps {
   @Given("hub {string} holds vehicle {string} in state {string} with a battery of {int}%")
   public void hubHoldsAVehicleInState(String hubCode, String code, String state, int battery) {
     if ("Deactivated".equals(state)) {
-      operator.bike(code, hub(hubCode));
+      operator().bike(code, hub(hubCode));
     } else {
       availableVehicle(code, "E_BIKE", hubCode, battery);
       jdbc.update("UPDATE vehicles SET state = ? WHERE code = ?", state.toUpperCase(), code);

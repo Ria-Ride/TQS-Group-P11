@@ -18,4 +18,11 @@ public interface UserRepository {
   Optional<User> findById(UUID id);
 
   List<User> findAll();
+
+  /**
+   * Finds the account and locks it until the current transaction ends, so two bookings of the same
+   * tourist are created one after the other (BR6). Must be called inside a transaction. Lock the
+   * account before any vehicle or hub, so two operations never wait for each other.
+   */
+  Optional<User> findByIdForUpdate(UUID id);
 }

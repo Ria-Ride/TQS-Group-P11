@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pt.ua.deti.tqs.p11.TestcontainersConfiguration;
+import pt.ua.deti.tqs.p11.application.TransactionRunner;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
 import pt.ua.deti.tqs.p11.domain.user.EmailAddress;
@@ -29,6 +31,7 @@ class UserPersistenceAdapterIT {
 
   @Autowired private UserRepository users;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private TransactionRunner transactions;
 
   @BeforeEach
   void emptyUsersTable() {
@@ -135,5 +138,26 @@ class UserPersistenceAdapterIT {
                     + " 'END_USER', TRUE, TRUE)",
                 ANA_ID))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  /**
+   * US04 (BR6): an account is locked while its booking is created, so two simultaneous bookings of
+   * one tourist run one after the other. The lock itself is shown by the concurrency test of
+   * KAN-702; here, that it finds the account inside a transaction.
+   */
+  @Test
+  void findByIdForUpdate_insideATransaction_findsTheAccount() {
+    users.save(User.guest(ANA_ID, "Ana Sousa", ANA_EMAIL, "hashed-password"));
+
+    Optional<User> locked = transactions.inTransaction(() -> users.findByIdForUpdate(ANA_ID));
+
+    assertThat(locked).isPresent();
+  }
+
+  @Test
+  void findByIdForUpdate_unknownId_isEmpty() {
+    Optional<User> locked = transactions.inTransaction(() -> users.findByIdForUpdate(OTHER_ID));
+
+    assertThat(locked).isEmpty();
   }
 }

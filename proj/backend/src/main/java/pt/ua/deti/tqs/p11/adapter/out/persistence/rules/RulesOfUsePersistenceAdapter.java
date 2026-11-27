@@ -2,6 +2,7 @@ package pt.ua.deti.tqs.p11.adapter.out.persistence.rules;
 
 import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -39,12 +40,14 @@ class RulesOfUsePersistenceAdapter implements RulesOfUseRepository {
 
   @Override
   public Optional<RulesOfUse> findCurrent() {
-    return jdbc.query(SELECT + " ORDER BY version DESC LIMIT 1", this::row).stream().findFirst();
+    return withVehicleTypes(jdbc.query(SELECT + " ORDER BY version DESC LIMIT 1", this::header))
+        .stream()
+        .findFirst();
   }
 
   @Override
   public List<RulesOfUse> findAll() {
-    return jdbc.query(SELECT + " ORDER BY version DESC", this::row);
+    return withVehicleTypes(jdbc.query(SELECT + " ORDER BY version DESC", this::header));
   }
 
   @Override
@@ -81,10 +84,26 @@ class RulesOfUsePersistenceAdapter implements RulesOfUseRepository {
     return rules;
   }
 
-  private RulesOfUse row(java.sql.ResultSet rs, int rowNumber) throws java.sql.SQLException {
-    int version = rs.getInt("version");
-    return new RulesOfUse(
-        version,
+  /**
+   * A stored version without its vehicle types. The types are read only after the versions' query
+   * has returned its connection: reading them inside the row mapper held two connections per read,
+   * and simultaneous bookings then used up the pool waiting on each other.
+   */
+  private record Header(
+      int version,
+      Instant createdAt,
+      UUID createdBy,
+      Duration maxBookingDuration,
+      BatteryLevel minBattery,
+      Duration startWindow,
+      Duration repositioningWindow,
+      Duration overtimeGrace,
+      Duration overtimeBlock,
+      Money overtimeRatePerBlock) {}
+
+  private Header header(java.sql.ResultSet rs, int rowNumber) throws java.sql.SQLException {
+    return new Header(
+        rs.getInt("version"),
         rs.getTimestamp("created_at").toInstant(),
         rs.getObject("created_by", UUID.class),
         Duration.ofMinutes(rs.getInt("max_booking_minutes")),
@@ -93,8 +112,25 @@ class RulesOfUsePersistenceAdapter implements RulesOfUseRepository {
         Duration.ofMinutes(rs.getInt("repositioning_window_minutes")),
         Duration.ofMinutes(rs.getInt("overtime_grace_minutes")),
         Duration.ofMinutes(rs.getInt("overtime_block_minutes")),
-        new Money(rs.getBigDecimal("overtime_rate_per_block")),
-        vehicleTypes(version));
+        new Money(rs.getBigDecimal("overtime_rate_per_block")));
+  }
+
+  private List<RulesOfUse> withVehicleTypes(List<Header> headers) {
+    return headers.stream()
+        .map(header ->
+            new RulesOfUse(
+                header.version(),
+                header.createdAt(),
+                header.createdBy(),
+                header.maxBookingDuration(),
+                header.minBattery(),
+                header.startWindow(),
+                header.repositioningWindow(),
+                header.overtimeGrace(),
+                header.overtimeBlock(),
+                header.overtimeRatePerBlock(),
+                vehicleTypes(header.version())))
+        .toList();
   }
 
   private Map<VehicleType, VehicleTypeRules> vehicleTypes(int version) {

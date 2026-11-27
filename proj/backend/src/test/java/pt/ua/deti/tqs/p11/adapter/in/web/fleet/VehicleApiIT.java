@@ -326,6 +326,21 @@ class VehicleApiIT {
     assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "AVAILABLE");
   }
 
+  /**
+   * US04: a vehicle is put InUse only by a booking, after its deposit is held (BR11), never as an
+   * operator transition.
+   */
+  @Test
+  void transition_startUse_returns400OnTheActionAndChangesNothing() {
+    UUID bike = availableBike();
+
+    ResponseEntity<Map<String, Object>> response = operator.transition(bike, "START_USE");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(errors(response)).containsOnlyKeys("action");
+    assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "AVAILABLE");
+  }
+
   @Test
   void transition_unknownVehicle_returns404() {
     ResponseEntity<Map<String, Object>> response =

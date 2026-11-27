@@ -59,6 +59,15 @@ class VehicleTest {
   }
 
   @Test
+  void startUse_availableVehicle_isInUseAndLeavesTheHub() {
+    Vehicle vehicle = registeredAtHub03().activate().withBattery(BatteryLevel.of(80)).startUse();
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.IN_USE);
+    assertThat(vehicle.currentHub()).isEmpty();
+    assertThat(vehicle.battery()).contains(BatteryLevel.of(80));
+  }
+
+  @Test
   void confirmArrival_vehicleInTransit_becomesAvailableAtTheDestination() {
     Vehicle vehicle = registeredAtHub03().activate().startMove().confirmArrival(HUB_05);
 

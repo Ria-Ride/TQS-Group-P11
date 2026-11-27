@@ -58,6 +58,11 @@ class UserPersistenceAdapter implements UserRepository {
   }
 
   @Override
+  public Optional<User> findByIdForUpdate(UUID id) {
+    return repository.findWithLockById(id).map(UserJpaEntity::toDomain);
+  }
+
+  @Override
   public List<User> findAll() {
     return repository.findAll(Sort.by("name")).stream().map(UserJpaEntity::toDomain).toList();
   }

@@ -9,9 +9,11 @@ import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.DEACTIVATE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.REPORT_FAULT;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RETIRE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_MOVE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_USE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.AVAILABLE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.DEACTIVATED;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_TRANSIT;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_USE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.MAINTENANCE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.RESERVED;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.RETIRED;
@@ -41,6 +43,7 @@ class VehicleStateTest {
           arguments(DEACTIVATED, RETIRE, RETIRED),
           arguments(AVAILABLE, RETIRE, RETIRED),
           arguments(MAINTENANCE, RETIRE, RETIRED),
+          arguments(AVAILABLE, START_USE, IN_USE),
           // BR18: a fault sends an Available or Reserved vehicle to maintenance (US10).
           arguments(AVAILABLE, REPORT_FAULT, MAINTENANCE),
           arguments(RESERVED, REPORT_FAULT, MAINTENANCE));

@@ -1,20 +1,27 @@
 package pt.ua.deti.tqs.p11.config;
 
+import java.time.Clock;
+import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import pt.ua.deti.tqs.p11.adapter.in.telemetry.MqttTelemetryConnection;
 import pt.ua.deti.tqs.p11.adapter.in.telemetry.MqttTelemetrySubscriber;
+import pt.ua.deti.tqs.p11.adapter.out.telemetry.LoggingVehicleCommands;
+import pt.ua.deti.tqs.p11.adapter.out.telemetry.MqttVehicleCommandPublisher;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
+import pt.ua.deti.tqs.p11.application.fleet.VehicleCommandPort;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
 import pt.ua.deti.tqs.p11.application.telemetry.FaultReportListener;
 import pt.ua.deti.tqs.p11.application.telemetry.TelemetryIngestionPort;
 import pt.ua.deti.tqs.p11.application.telemetry.TelemetryIngestionUseCase;
 
 /**
- * Wires telemetry (US09): the core port always, the MQTT adapter only when app.telemetry.enabled is
- * true. A different simulator is a different adapter wired here; the core does not change (K1).
+ * Wires telemetry (US09) and commands to vehicles (US04): the core port always, the MQTT adapters
+ * only when app.telemetry.enabled is true; otherwise commands are only logged. A different
+ * simulator is a different adapter wired here; the core does not change (K1).
  */
 @Configuration
 @EnableConfigurationProperties(TelemetryProperties.class)
@@ -24,6 +31,26 @@ class TelemetryConfiguration {
   TelemetryIngestionPort telemetryIngestionPort(
       VehicleRepository vehicles, TransactionRunner transactions, FaultReportListener faults) {
     return new TelemetryIngestionUseCase(vehicles, transactions, faults);
+  }
+
+  /**
+   * Commands to vehicles (US04): over the telemetry connection when it exists (simulator contract),
+   * otherwise only logged. One bean for both cases, so there is a single VehicleCommandPort to
+   * inject.
+   */
+  @Bean
+  VehicleCommandPort vehicleCommands(
+      ObjectProvider<MqttTelemetryConnection> mqtt, TelemetryProperties properties, Clock clock) {
+    MqttTelemetryConnection connection = mqtt.getIfAvailable();
+    if (connection == null) {
+      return new LoggingVehicleCommands();
+    }
+    return new MqttVehicleCommandPublisher(
+        connection.client(),
+        properties.fleetId(),
+        properties.commandTtl(),
+        clock,
+        UUID::randomUUID);
   }
 
   @Configuration
