@@ -3,6 +3,8 @@ package pt.ua.deti.tqs.p11.domain.booking;
 import java.time.Duration;
 import java.util.Objects;
 import pt.ua.deti.tqs.p11.domain.billing.Money;
+import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
+import pt.ua.deti.tqs.p11.domain.rules.RulesOfUse;
 
 /**
  * BR21: the rules of use a booking keeps from the moment it is created, so a later change by the
@@ -32,5 +34,15 @@ public record BookingRules(
     if (overtimeBlock.isNegative() || overtimeBlock.isZero()) {
       throw new IllegalArgumentException("The overtime block must be positive: " + overtimeBlock);
     }
+  }
+
+  /** What a new booking of this vehicle type keeps of the rules of use in force (US14). */
+  public static BookingRules of(RulesOfUse inForce, VehicleType type) {
+    return new BookingRules(
+        inForce.deposit(type),
+        inForce.startWindow(),
+        inForce.overtimeGrace(),
+        inForce.overtimeBlock(),
+        inForce.overtimeRatePerBlock());
   }
 }

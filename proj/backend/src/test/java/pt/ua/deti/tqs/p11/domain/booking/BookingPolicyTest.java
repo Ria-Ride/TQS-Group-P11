@@ -33,6 +33,7 @@ class BookingPolicyTest {
   private static final UUID ANA = UUID.randomUUID();
   private static final UUID HUB = UUID.randomUUID();
   private static final UUID OTHER_BIKE = UUID.randomUUID();
+
   /**
    * Longest booking 4 hours; BR1: a 20% floor plus 5% per started 30 minutes, for both types;
    * deposits 30.00 (E_BIKE) and 50.00 (E_SCOOTER).

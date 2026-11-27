@@ -110,7 +110,7 @@ public class StartUseUseCase {
         command.plannedEnd(),
         passes.ofAccount(account),
         bookings.findOngoingByAccount(account));
-    BookingRules rules = policy.rules().forType(vehicle.type());
+    BookingRules rules = policy.bookingRules(vehicle.type());
     Money deposit = rules.deposit();
 
     // Step 2: the deposit, outside any transaction.

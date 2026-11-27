@@ -9,25 +9,28 @@ import java.util.OptionalInt;
 import pt.ua.deti.tqs.p11.domain.fleet.BatteryRule;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
+import pt.ua.deti.tqs.p11.domain.rules.RulesOfUse;
 
 /**
  * Decides whether a booking can be created, in one place for immediate use (US04) and future
  * bookings (US05). The rules are checked in this order, and the first that fails is reported:
  * duration (BR5), vehicle (BR2, then BR1), Pass (BR4), overlap with the tourist's bookings (BR6).
- * Time is given, never read: the caller takes it from its injected Clock.
+ * Time is given, never read: the caller takes it from its injected Clock. The rules of use are the
+ * version in force when the policy is made (US14), battery rule included.
  */
 public final class BookingPolicy {
 
-  private final UsageRules rules;
+  private final RulesOfUse rules;
   private final BatteryRule battery;
 
-  public BookingPolicy(UsageRules rules, BatteryRule battery) {
+  public BookingPolicy(RulesOfUse rules) {
     this.rules = Objects.requireNonNull(rules, "rules");
-    this.battery = Objects.requireNonNull(battery, "battery");
+    this.battery = rules.batteryRule();
   }
 
-  public UsageRules rules() {
-    return rules;
+  /** BR21: what a new booking of this vehicle type keeps of the rules this policy checks. */
+  public BookingRules bookingRules(VehicleType type) {
+    return BookingRules.of(rules, type);
   }
 
   /**
@@ -68,7 +71,7 @@ public final class BookingPolicy {
 
   /**
    * BR2, then BR1 with the planned duration; a started minute counts as a whole one. The duration
-   * is at most one day here (UsageRules), which is what the battery rule accepts.
+   * is at most one day here (RulesOfUse), which is what the battery rule accepts.
    */
   private void checkVehicle(Vehicle vehicle, Duration duration) {
     long minutes = duration.toMinutes();

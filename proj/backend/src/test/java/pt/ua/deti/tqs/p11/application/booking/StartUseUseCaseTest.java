@@ -79,8 +79,10 @@ class StartUseUseCaseTest {
   private static final FleetCode BIKE_CODE = FleetCode.of("bike-0001");
   private static final User ANA_ACCOUNT =
       User.guest(ANA, "Ana Lopes", new EmailAddress("ana.lopes@example.com"), "hash");
+
   /** Longest booking 4 hours; 20% + 5% per started 30 minutes; deposits 30.00 and 50.00. */
   private static final RulesOfUse RULES = TestRules.bookingRules();
+
   private static final PassCoverage DAY_PASS =
       new PassCoverage(
           PASS_ID,

@@ -275,7 +275,7 @@ class ApiExceptionHandler {
         "The deposit got no answer in time",
         Map.of(DEPOSIT, "got no answer in time; try again"));
   }
-  
+
   // US10: maintenance tickets.
 
   /** BR20: the fault is covered; ticketId is the open ticket, so the operator can go to it. */
