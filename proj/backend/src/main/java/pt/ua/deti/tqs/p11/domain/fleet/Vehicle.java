@@ -204,7 +204,7 @@ public record Vehicle(
    * still open for it is checked by the caller on the locked vehicle.
    */
   public Vehicle returnToService() {
-    throw new UnsupportedOperationException("US11");
+    return transition(VehicleAction.RETURN_TO_SERVICE, hubId);
   }
 
   /**

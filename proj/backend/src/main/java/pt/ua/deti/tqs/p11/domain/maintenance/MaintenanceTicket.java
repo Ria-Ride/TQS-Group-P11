@@ -61,6 +61,21 @@ public record MaintenanceTicket(
       throw new IllegalArgumentException(
           "A ticket in state %s needs a technician".formatted(state));
     }
+    if (workDone != null) {
+      workDone = workDone.strip();
+      if (workDone.isEmpty()) {
+        throw new IllegalArgumentException("The work done, when given, cannot be blank");
+      }
+    }
+    // US11: the closing time and the work done are there exactly when the ticket is Closed.
+    boolean closed = state == TicketState.CLOSED;
+    if (closed != (closedAt != null) || closed != (workDone != null)) {
+      throw new IllegalArgumentException(
+          "Only a Closed ticket, and every Closed ticket, has a closing time and the work done");
+    }
+    if (closedAt != null && closedAt.isBefore(openedAt)) {
+      throw new IllegalArgumentException("A ticket cannot be closed before it was opened");
+    }
   }
 
   /** A ticket that is not closed: no closing time and no record of the work. */
@@ -176,7 +191,18 @@ public record MaintenanceTicket(
    * @throws NotTheAssignedTechnicianException if someone else asks
    */
   public MaintenanceTicket start(UUID technicianId) {
-    throw new UnsupportedOperationException("US11");
+    requireState(TicketState.ASSIGNED, "started");
+    requireAssignedTo(technicianId);
+    return new MaintenanceTicket(
+        id,
+        vehicleId,
+        faultCode,
+        description,
+        TicketState.IN_PROGRESS,
+        openedAt,
+        slaDeadline,
+        openedBy,
+        this.technicianId);
   }
 
   /**
@@ -187,7 +213,26 @@ public record MaintenanceTicket(
    * @throws IllegalArgumentException if workDone is blank or the closing is before the opening
    */
   public MaintenanceTicket close(UUID technicianId, String workDone, Instant at) {
-    throw new UnsupportedOperationException("US11");
+    Objects.requireNonNull(workDone, "workDone");
+    Objects.requireNonNull(at, "at");
+    requireState(TicketState.IN_PROGRESS, "closed");
+    requireAssignedTo(technicianId);
+    if (workDone.isBlank()) {
+      throw new IllegalArgumentException("Closing a ticket needs a record of the work done");
+    }
+    // The constructor refuses a closing before the opening.
+    return new MaintenanceTicket(
+        id,
+        vehicleId,
+        faultCode,
+        description,
+        TicketState.CLOSED,
+        openedAt,
+        slaDeadline,
+        openedBy,
+        this.technicianId,
+        at,
+        workDone);
   }
 
   /**
@@ -196,12 +241,29 @@ public record MaintenanceTicket(
    * time.
    */
   public boolean isBreachedAt(Instant now) {
-    throw new UnsupportedOperationException("US11");
+    Objects.requireNonNull(now, "now");
+    return switch (state) {
+      case CLOSED -> closedAt.isAfter(slaDeadline);
+      case CANCELLED -> false;
+      case OPEN, ASSIGNED, IN_PROGRESS -> now.isAfter(slaDeadline);
+    };
   }
 
   /** BR19: from opening to closing, for the KPIs; empty until the ticket is closed. */
   public Optional<Duration> timeToRepair() {
-    throw new UnsupportedOperationException("US11");
+    return Optional.ofNullable(closedAt).map(closed -> Duration.between(openedAt, closed));
+  }
+
+  private void requireState(TicketState expected, String action) {
+    if (state != expected) {
+      throw new ForbiddenTicketTransitionException(state, action);
+    }
+  }
+
+  private void requireAssignedTo(UUID technician) {
+    if (!Objects.equals(technicianId, technician)) {
+      throw new NotTheAssignedTechnicianException(id, technician);
+    }
   }
 
   /** BR20: whether the account can take tickets: an active OPERATOR who is a field technician. */
