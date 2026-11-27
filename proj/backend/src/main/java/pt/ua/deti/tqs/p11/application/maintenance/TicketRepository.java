@@ -25,6 +25,12 @@ public interface TicketRepository {
   /** Every open ticket (Open, Assigned or InProgress), the nearest SLA deadline first (BR19). */
   List<MaintenanceTicket> findOpen();
 
+  /**
+   * US11: the open tickets (Assigned or InProgress) assigned to the technician, the nearest SLA
+   * deadline first (BR19).
+   */
+  List<MaintenanceTicket> findOpenAssignedTo(UUID technicianId);
+
   /** BR16, BR20: whether the vehicle has any open ticket, whatever its fault. */
   boolean existsOpenFor(UUID vehicleId);
 }

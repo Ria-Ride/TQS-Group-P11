@@ -304,6 +304,49 @@ class TicketPersistenceAdapterIT {
         .containsExactly(sooner, later);
   }
 
+  // ------------------------------------------------------------- a technician's tickets (US11)
+
+  /**
+   * BR19: the technician's most urgent ticket first. Tickets of another technician, not assigned
+   * yet, or finished are not theirs to work on.
+   */
+  @Test
+  void findOpenAssignedTo_listsTheTechniciansOpenTicketsNearestDeadlineFirst() {
+    UUID otherId = UUID.fromString("5e6f7a8b-0000-4000-8000-000000000302");
+    jdbc.update(
+        "INSERT INTO users (id, name, email, password_hash, role, field_technician)"
+            + " VALUES (?, 'Ana Matos', 'ticket.other.it@example.com', 'x', 'OPERATOR', TRUE)",
+        otherId);
+    User other =
+        User.account(
+            otherId,
+            "Ana Matos",
+            new EmailAddress("ticket.other.it@example.com"),
+            "x",
+            Role.OPERATOR,
+            true);
+    MaintenanceTicket later = fromFault(BRAKE_WEAR).assignTo(technician());
+    MaintenanceTicket sooner =
+        MaintenanceTicket.openFromFault(
+                UUID.randomUUID(), VEHICLE_ID, LOW_TYRE_PRESSURE, OPENED_AT.minusSeconds(3600), SLA)
+            .assignTo(technician())
+            .start(TECHNICIAN_ID);
+    tickets.save(later);
+    tickets.save(sooner);
+    tickets.save(fromFault(FaultCode.of("FLAT_TIRE")).assignTo(other));
+    tickets.save(fromFault(FaultCode.of("BATTERY_OVERHEAT")));
+    tickets.save(finished(TicketState.CLOSED, FaultCode.of("BROKEN_BASKET")));
+
+    assertThat(tickets.findOpenAssignedTo(TECHNICIAN_ID)).containsExactly(sooner, later);
+  }
+
+  @Test
+  void findOpenAssignedTo_technicianWithoutTickets_isEmpty() {
+    tickets.save(fromFault(BRAKE_WEAR));
+
+    assertThat(tickets.findOpenAssignedTo(TECHNICIAN_ID)).isEmpty();
+  }
+
   @Test
   void existsOpenFor_vehicleWithAnAssignedTicket_isTrue() {
     tickets.save(fromFault(BRAKE_WEAR).assignTo(technician()));
