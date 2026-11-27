@@ -81,6 +81,7 @@ class SecurityConfiguration {
                     HttpMethod.GET,
                     "/vehicles/{id}/history",
                     "/tickets",
+                    "/tickets/mine",
                     "/technicians",
                     "/fleet/overview")
                 .hasAnyRole(OPERATOR, ADMIN)
@@ -90,6 +91,7 @@ class SecurityConfiguration {
                     "/vehicles",
                     "/vehicles/{id}/transitions",
                     "/tickets",
+                    "/tickets/{id}/start",
                     "/tickets/{id}/close")
                 .hasAnyRole(OPERATOR, ADMIN)
                 .requestMatchers(HttpMethod.PATCH, "/tickets/{id}/assignee")
