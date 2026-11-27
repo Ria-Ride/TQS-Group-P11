@@ -62,7 +62,9 @@ class TicketPersistenceAdapterIT {
     return MaintenanceTicket.openFromFault(UUID.randomUUID(), VEHICLE_ID, fault, OPENED_AT, SLA);
   }
 
+  /** A Closed ticket has its closing time and work done (US11); a Cancelled one has neither. */
   private static MaintenanceTicket finished(TicketState state, FaultCode fault) {
+    boolean closed = state == TicketState.CLOSED;
     return new MaintenanceTicket(
         UUID.randomUUID(),
         VEHICLE_ID,
@@ -72,7 +74,9 @@ class TicketPersistenceAdapterIT {
         OPENED_AT,
         OPENED_AT.plus(SLA),
         null,
-        TECHNICIAN_ID);
+        TECHNICIAN_ID,
+        closed ? OPENED_AT.plus(Duration.ofHours(2)) : null,
+        closed ? "Replaced brake pads" : null);
   }
 
   private static User technician() {
@@ -170,6 +174,24 @@ class TicketPersistenceAdapterIT {
     tickets.save(ticket);
 
     assertThat(tickets.findById(ticket.id())).contains(ticket);
+  }
+
+  /** US11: a closed ticket keeps when it was closed and the work done (time to repair, BR19). */
+  @Test
+  void findById_closedTicket_keepsTheClosingTimeAndTheWorkDone() {
+    MaintenanceTicket closed = finished(TicketState.CLOSED, BRAKE_WEAR);
+    tickets.save(closed);
+
+    assertThat(tickets.findById(closed.id())).contains(closed);
+  }
+
+  /** A Closed ticket needs both, also for rows edited by hand. */
+  @Test
+  void database_refusesAClosedTicketWithoutClosingTimeOrWork() {
+    Instant deadline = OPENED_AT.plus(SLA);
+
+    assertThatThrownBy(() -> insertRow("CLOSED", deadline, TECHNICIAN_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test

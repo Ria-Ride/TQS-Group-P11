@@ -65,6 +65,7 @@ class VehicleController {
           case REPORT_FAULT ->
               throw new InvalidFieldException(
                   "action", "is reported by telemetry or a maintenance ticket, not by an operator");
+          case RETURN_TO_SERVICE -> throw new UnsupportedOperationException("US11");
         };
     return VehicleResponse.from(vehicle);
   }

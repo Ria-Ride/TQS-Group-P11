@@ -11,10 +11,11 @@ import pt.ua.deti.tqs.p11.domain.user.Role;
 import pt.ua.deti.tqs.p11.domain.user.User;
 
 /**
- * A repair job for one vehicle and one fault (US10). Immutable: every change returns a new ticket,
- * and the constructor checks the rules, so an invalid ticket cannot exist. description is null for
- * a ticket opened from a fault reading; openedBy is the operator of a manual ticket, null for one
- * opened from a fault reading; technicianId is null until the ticket is assigned.
+ * A repair job for one vehicle and one fault (US10, US11). Immutable: every change returns a new
+ * ticket, and the constructor checks the rules, so an invalid ticket cannot exist. description is
+ * null for a ticket opened from a fault reading; openedBy is the operator of a manual ticket, null
+ * for one opened from a fault reading; technicianId is null until the ticket is assigned; closedAt
+ * and workDone are set when, and only when, the ticket is Closed.
  */
 public record MaintenanceTicket(
     UUID id,
@@ -25,7 +26,9 @@ public record MaintenanceTicket(
     Instant openedAt,
     Instant slaDeadline,
     UUID openedBy,
-    UUID technicianId) {
+    UUID technicianId,
+    Instant closedAt,
+    String workDone) {
 
   /** States in which someone is responsible for the work, so a technician must be set. */
   private static final Set<TicketState> WITH_TECHNICIAN =
@@ -58,6 +61,31 @@ public record MaintenanceTicket(
       throw new IllegalArgumentException(
           "A ticket in state %s needs a technician".formatted(state));
     }
+  }
+
+  /** A ticket that is not closed: no closing time and no record of the work. */
+  public MaintenanceTicket(
+      UUID id,
+      UUID vehicleId,
+      FaultCode faultCode,
+      String description,
+      TicketState state,
+      Instant openedAt,
+      Instant slaDeadline,
+      UUID openedBy,
+      UUID technicianId) {
+    this(
+        id,
+        vehicleId,
+        faultCode,
+        description,
+        state,
+        openedAt,
+        slaDeadline,
+        openedBy,
+        technicianId,
+        null,
+        null);
   }
 
   /** BR18, BR19: a ticket opened from a fault reading, due openedAt + sla. */
@@ -139,6 +167,41 @@ public record MaintenanceTicket(
         slaDeadline,
         openedBy,
         technician.id());
+  }
+
+  /**
+   * US11: the assigned technician starts the work on an Assigned ticket.
+   *
+   * @throws ForbiddenTicketTransitionException if the ticket is not Assigned
+   * @throws NotTheAssignedTechnicianException if someone else asks
+   */
+  public MaintenanceTicket start(UUID technicianId) {
+    throw new UnsupportedOperationException("US11");
+  }
+
+  /**
+   * BR20: the assigned technician closes an InProgress ticket, recording the work done.
+   *
+   * @throws ForbiddenTicketTransitionException if the ticket is not InProgress
+   * @throws NotTheAssignedTechnicianException if someone else asks
+   * @throws IllegalArgumentException if workDone is blank or the closing is before the opening
+   */
+  public MaintenanceTicket close(UUID technicianId, String workDone, Instant at) {
+    throw new UnsupportedOperationException("US11");
+  }
+
+  /**
+   * BR19: whether the SLA deadline was missed. An open ticket is late once now is after the
+   * deadline; a closed one, if it was closed after the deadline. Exactly at the deadline is on
+   * time.
+   */
+  public boolean isBreachedAt(Instant now) {
+    throw new UnsupportedOperationException("US11");
+  }
+
+  /** BR19: from opening to closing, for the KPIs; empty until the ticket is closed. */
+  public Optional<Duration> timeToRepair() {
+    throw new UnsupportedOperationException("US11");
   }
 
   /** BR20: whether the account can take tickets: an active OPERATOR who is a field technician. */
