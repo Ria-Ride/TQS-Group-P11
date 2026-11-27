@@ -20,7 +20,8 @@ public enum VehicleState {
   /**
    * BR16: the state reached by the action. Activation always leads to Available; retirement is
    * final. A vehicle with an active booking is Reserved or InUse, so it can be neither deactivated
-   * nor retired. BR18: a fault sends an Available or Reserved vehicle to Maintenance.
+   * nor retired. BR18: a fault sends an Available or Reserved vehicle to Maintenance; BR20: it
+   * returns to Available when its last open ticket is closed.
    *
    * @throws ForbiddenTransitionException if the lifecycle has no such transition
    */
@@ -54,6 +55,7 @@ public enum VehicleState {
       case RETIRE -> to(RETIRED, EnumSet.of(DEACTIVATED, AVAILABLE, MAINTENANCE));
       case START_USE -> to(IN_USE, EnumSet.of(AVAILABLE));
       case REPORT_FAULT -> to(MAINTENANCE, EnumSet.of(AVAILABLE, RESERVED));
+      case RETURN_TO_SERVICE -> to(AVAILABLE, EnumSet.of(MAINTENANCE));
     };
   }
 

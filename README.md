@@ -109,7 +109,10 @@ A reading with a fault code opens a maintenance ticket (US10), due 24 hours late
 or Reserved vehicle goes to Maintenance; the fault repeated by later readings opens no other ticket.
 Operators see the open tickets, open one by hand and assign field technicians at
 `/operator/tickets` ("Maintenance tickets" on the home page). A vehicle with an open ticket cannot
-be activated. To watch it happen, run the simulator scenario with scripted faults by adding
+be activated. Field technicians (operators with `fieldTechnician` set) see their own tickets at
+`/technician/tickets` ("My tickets"), late ones marked, start the work and close the ticket with the
+work done (US11); closing the last open ticket of a vehicle in Maintenance returns it to Available.
+To watch it happen, run the simulator scenario with scripted faults by adding
 `SIMULATOR_SCENARIO_FILE=classpath:scenarios/ria-ride-faults.yml` to `.env`: about 30, 60 and 90
 seconds after the simulator starts, `bike-0001`, `scooter-0001` and `bike-0002` report a fault.
 

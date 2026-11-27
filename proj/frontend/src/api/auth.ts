@@ -11,6 +11,8 @@ export interface UserProfile {
   name: string;
   email: string;
   role: string;
+  /** US11: true for an OPERATOR who is a field technician; the server always sends it. */
+  fieldTechnician?: boolean;
 }
 
 export interface GuestRegistration {

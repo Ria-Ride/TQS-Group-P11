@@ -1,6 +1,7 @@
 package pt.ua.deti.tqs.p11.adapter.in.web.maintenance;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static pt.ua.deti.tqs.p11.support.FleetApi.errors;
 import static pt.ua.deti.tqs.p11.support.FleetApi.id;
 
@@ -231,6 +232,23 @@ class TicketApiIT {
     assertThat(tickets)
         .extracting(ticket -> ticket.get("id"))
         .containsExactly(second.toString(), first.toString());
+  }
+
+  /** BR19: the operator's list marks the tickets past their deadline too (US11). */
+  @Test
+  void list_marksTheTicketsPastTheirDeadline() {
+    UUID late = openTicket(availableBike(), "BRAKE_WEAR");
+    UUID onTime = openTicket(bikeIn("bike-0010", "ACTIVATE"), "FLAT_TIRE");
+    jdbc.update(
+        "UPDATE maintenance_tickets SET opened_at = opened_at - INTERVAL '25 hours',"
+            + " sla_deadline = sla_deadline - INTERVAL '25 hours' WHERE id = ?",
+        late);
+
+    List<Map<String, Object>> tickets = operator.getList("/tickets").getBody();
+
+    assertThat(tickets)
+        .extracting(ticket -> ticket.get("id"), ticket -> ticket.get("breached"))
+        .containsExactly(tuple(late.toString(), true), tuple(onTime.toString(), false));
   }
 
   // ------------------------------------------------------------- assignment (BR20)

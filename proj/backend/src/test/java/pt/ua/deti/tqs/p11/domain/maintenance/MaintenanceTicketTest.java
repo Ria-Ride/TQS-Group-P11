@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -17,9 +18,10 @@ import pt.ua.deti.tqs.p11.domain.user.Role;
 import pt.ua.deti.tqs.p11.domain.user.User;
 
 /**
- * A maintenance ticket from opening to assignment (US10). BR19: the SLA deadline is the opening
- * time plus the contracted repair time. BR20: only an active OPERATOR who is a field technician can
- * be assigned. Starting, closing and breaching a ticket belong to US11.
+ * A maintenance ticket from opening to closing (US10, US11). BR19: the SLA deadline is the opening
+ * time plus the contracted repair time, and a ticket closed after it is breached. BR20: only an
+ * active OPERATOR who is a field technician can be assigned, and only that technician can start and
+ * close the ticket, recording the work done.
  */
 class MaintenanceTicketTest {
 
@@ -45,7 +47,9 @@ class MaintenanceTicketTest {
     return account(id, Role.OPERATOR, true);
   }
 
+  /** A Closed ticket comes with its closing time and work done, as US11 requires. */
   private static MaintenanceTicket inState(TicketState state, UUID technicianId) {
+    boolean closed = state == TicketState.CLOSED;
     return new MaintenanceTicket(
         TICKET,
         VEHICLE,
@@ -55,7 +59,17 @@ class MaintenanceTicketTest {
         OPENED_AT,
         OPENED_AT.plus(SLA),
         null,
-        technicianId);
+        technicianId,
+        closed ? OPENED_AT.plus(Duration.ofHours(2)) : null,
+        closed ? "Replaced brake pads" : null);
+  }
+
+  private static MaintenanceTicket inProgress() {
+    return fromFault().assignTo(technician(TIAGO)).start(TIAGO);
+  }
+
+  private static MaintenanceTicket closedAfter(Duration repair) {
+    return inProgress().close(TIAGO, "Replaced brake pads", OPENED_AT.plus(repair));
   }
 
   // ------------------------------------------------------------- opening
@@ -255,5 +269,221 @@ class MaintenanceTicketTest {
             new MaintenanceTicket(
                 TICKET, VEHICLE, BRAKE_WEAR, null, open, OPENED_AT, null, null, null))
         .isInstanceOf(NullPointerException.class);
+  }
+
+  // ------------------------------------------------------------- starting the work (US11)
+
+  @Test
+  void start_assignedTicketByItsTechnician_isInProgressWithTheSameTechnician() {
+    MaintenanceTicket started = fromFault().assignTo(technician(TIAGO)).start(TIAGO);
+
+    assertThat(started.state()).isEqualTo(TicketState.IN_PROGRESS);
+    assertThat(started.assignedTechnician()).contains(TIAGO);
+    assertThat(started.slaDeadline()).isEqualTo(OPENED_AT.plus(SLA));
+  }
+
+  @Test
+  void start_byAnotherTechnician_isRefused() {
+    MaintenanceTicket assigned = fromFault().assignTo(technician(TIAGO));
+
+    assertThatThrownBy(() -> assigned.start(RITA))
+        .isInstanceOfSatisfying(
+            NotTheAssignedTechnicianException.class,
+            e -> {
+              assertThat(e.ticketId()).isEqualTo(TICKET);
+              assertThat(e.userId()).isEqualTo(RITA);
+            });
+  }
+
+  @Test
+  void start_openTicket_isRefusedBecauseNobodyIsAssigned() {
+    MaintenanceTicket open = fromFault();
+
+    assertThatThrownBy(() -> open.start(TIAGO))
+        .isInstanceOfSatisfying(
+            ForbiddenTicketTransitionException.class,
+            e -> assertThat(e.from()).isEqualTo(TicketState.OPEN));
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"IN_PROGRESS", "CLOSED", "CANCELLED"})
+  void start_ticketPastAssignment_isRefused(TicketState state) {
+    MaintenanceTicket ticket = inState(state, TIAGO);
+
+    assertThatThrownBy(() -> ticket.start(TIAGO))
+        .isInstanceOfSatisfying(
+            ForbiddenTicketTransitionException.class, e -> assertThat(e.from()).isEqualTo(state));
+  }
+
+  // ------------------------------------------------------------- closing (BR20)
+
+  @Test
+  void close_inProgressTicketByItsTechnician_isClosedWithTheWorkAndTheTime() {
+    Instant at = OPENED_AT.plus(Duration.ofHours(3));
+
+    MaintenanceTicket closed = inProgress().close(TIAGO, "  Replaced brake pads  ", at);
+
+    assertThat(closed.state()).isEqualTo(TicketState.CLOSED);
+    assertThat(closed.workDone()).isEqualTo("Replaced brake pads");
+    assertThat(closed.closedAt()).isEqualTo(at);
+    assertThat(closed.assignedTechnician()).contains(TIAGO);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   "})
+  void close_blankWorkDone_isRefused(String workDone) {
+    MaintenanceTicket ticket = inProgress();
+    Instant at = OPENED_AT.plus(Duration.ofHours(3));
+
+    assertThatThrownBy(() -> ticket.close(TIAGO, workDone, at))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void close_withoutWorkDone_isRefused() {
+    MaintenanceTicket ticket = inProgress();
+    Instant at = OPENED_AT.plus(Duration.ofHours(3));
+
+    assertThatThrownBy(() -> ticket.close(TIAGO, null, at))
+        .isInstanceOf(NullPointerException.class);
+  }
+
+  @Test
+  void close_byAnotherTechnician_isRefused() {
+    MaintenanceTicket ticket = inProgress();
+    Instant at = OPENED_AT.plus(Duration.ofHours(3));
+
+    assertThatThrownBy(() -> ticket.close(RITA, "Replaced brake pads", at))
+        .isInstanceOf(NotTheAssignedTechnicianException.class);
+  }
+
+  /** The criterion closes an InProgress ticket: the work must have been started first. */
+  @ParameterizedTest
+  @EnumSource(names = {"ASSIGNED", "CLOSED", "CANCELLED"})
+  void close_ticketNotInProgress_isRefused(TicketState state) {
+    MaintenanceTicket ticket = inState(state, TIAGO);
+    Instant at = OPENED_AT.plus(Duration.ofHours(3));
+
+    assertThatThrownBy(() -> ticket.close(TIAGO, "Replaced brake pads", at))
+        .isInstanceOfSatisfying(
+            ForbiddenTicketTransitionException.class, e -> assertThat(e.from()).isEqualTo(state));
+  }
+
+  @Test
+  void close_beforeTheOpening_isRefused() {
+    MaintenanceTicket ticket = inProgress();
+    Instant before = OPENED_AT.minusSeconds(1);
+
+    assertThatThrownBy(() -> ticket.close(TIAGO, "Replaced brake pads", before))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  // ------------------------------------------------------------- SLA and time to repair (BR19)
+
+  /** BR19: closed 24 h 00 min after opening is on time; 24 h 01 min is breached. */
+  @ParameterizedTest(name = "closed after {0} minutes: breached {1}")
+  @CsvSource({"1439, false", "1440, false", "1441, true"})
+  void isBreachedAt_closedTicket_dependsOnWhenItWasClosed(long minutes, boolean breached) {
+    MaintenanceTicket closed = closedAfter(Duration.ofMinutes(minutes));
+
+    // Long after the deadline, so only the closing time can decide.
+    assertThat(closed.isBreachedAt(OPENED_AT.plus(Duration.ofDays(10)))).isEqualTo(breached);
+  }
+
+  /** An open ticket becomes breached once now is past its deadline, not at the deadline itself. */
+  @ParameterizedTest(name = "open, {0} minutes after opening: breached {1}")
+  @CsvSource({"1439, false", "1440, false", "1441, true"})
+  void isBreachedAt_openTicket_dependsOnNow(long minutes, boolean breached) {
+    MaintenanceTicket open = inProgress();
+
+    assertThat(open.isBreachedAt(OPENED_AT.plus(Duration.ofMinutes(minutes)))).isEqualTo(breached);
+  }
+
+  /** A cancelled ticket needs no repair, so it is never late, however long ago it was due. */
+  @Test
+  void isBreachedAt_cancelledTicket_isNeverBreached() {
+    MaintenanceTicket cancelled = inState(TicketState.CANCELLED, TIAGO);
+
+    assertThat(cancelled.isBreachedAt(OPENED_AT.plus(Duration.ofDays(10)))).isFalse();
+  }
+
+  @Test
+  void timeToRepair_closedTicket_isFromOpeningToClosing() {
+    assertThat(closedAfter(Duration.ofMinutes(1441)).timeToRepair())
+        .contains(Duration.ofMinutes(1441));
+  }
+
+  @Test
+  void timeToRepair_ticketNotClosed_isEmpty() {
+    assertThat(inProgress().timeToRepair()).isEmpty();
+  }
+
+  // ------------------------------------------------------------- invariants of closing
+
+  @Test
+  void new_closedTicketWithoutClosingTimeOrWork_isRejected() {
+    assertThatThrownBy(() -> closedWith(null, "Replaced brake pads"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> closedWith(OPENED_AT.plusSeconds(60), null))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> closedWith(OPENED_AT.plusSeconds(60), " "))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void new_closedBeforeOpening_isRejected() {
+    assertThatThrownBy(() -> closedWith(OPENED_AT.minusSeconds(1), "Replaced brake pads"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"OPEN", "ASSIGNED", "IN_PROGRESS", "CANCELLED"})
+  void new_ticketNotClosedWithClosingTimeOrWork_isRejected(TicketState state) {
+    UUID technician = state == TicketState.OPEN ? null : TIAGO;
+    Instant deadline = OPENED_AT.plus(SLA);
+
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET,
+                VEHICLE,
+                BRAKE_WEAR,
+                null,
+                state,
+                OPENED_AT,
+                deadline,
+                null,
+                technician,
+                OPENED_AT.plusSeconds(60),
+                null))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() ->
+            new MaintenanceTicket(
+                TICKET,
+                VEHICLE,
+                BRAKE_WEAR,
+                null,
+                state,
+                OPENED_AT,
+                deadline,
+                null,
+                technician,
+                null,
+                "Replaced brake pads"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  private static MaintenanceTicket closedWith(Instant closedAt, String workDone) {
+    return new MaintenanceTicket(
+        TICKET,
+        VEHICLE,
+        BRAKE_WEAR,
+        null,
+        TicketState.CLOSED,
+        OPENED_AT,
+        OPENED_AT.plus(SLA),
+        null,
+        TIAGO,
+        closedAt,
+        workDone);
   }
 }

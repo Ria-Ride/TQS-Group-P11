@@ -341,6 +341,21 @@ class VehicleApiIT {
     assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "AVAILABLE");
   }
 
+  /**
+   * BR20: a vehicle leaves Maintenance only when its last open ticket is closed (US11), never as an
+   * operator transition.
+   */
+  @Test
+  void transition_returnToService_returns400OnTheActionAndChangesNothing() {
+    UUID bike = availableBike();
+
+    ResponseEntity<Map<String, Object>> response = operator.transition(bike, "RETURN_TO_SERVICE");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(errors(response)).containsOnlyKeys("action");
+    assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "AVAILABLE");
+  }
+
   @Test
   void transition_unknownVehicle_returns404() {
     ResponseEntity<Map<String, Object>> response =

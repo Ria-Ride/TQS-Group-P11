@@ -72,6 +72,11 @@ export function HomePage() {
                   Maintenance tickets
                 </Link>
               )}
+              {profile.role === "OPERATOR" && profile.fieldTechnician === true && (
+                <Link className="button" to="/technician/tickets">
+                  My tickets
+                </Link>
+              )}
               {(profile.role === "CLIENT_MANAGER" || profile.role === "ADMIN") && (
                 <Link className="button" to="/client">
                   Manage the service

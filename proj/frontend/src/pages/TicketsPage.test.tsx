@@ -60,6 +60,10 @@ const brakes: Ticket = {
   openedBy: null,
   technicianId: null,
   automatic: true,
+  closedAt: null,
+  workDone: null,
+  timeToRepairMinutes: null,
+  breached: false,
 };
 
 /** Opened by an operator and already assigned; its deadline is the nearest. */
@@ -74,6 +78,10 @@ const basket: Ticket = {
   openedBy: USER_ID,
   technicianId: tiago.id,
   automatic: false,
+  closedAt: null,
+  workDone: null,
+  timeToRepairMinutes: null,
+  breached: false,
 };
 
 function openAs(

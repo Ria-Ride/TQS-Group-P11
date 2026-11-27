@@ -63,6 +63,15 @@ class TicketPersistenceAdapter implements TicketRepository {
   }
 
   @Override
+  public List<MaintenanceTicket> findOpenAssignedTo(UUID technicianId) {
+    return repository
+        .findByTechnicianIdAndStateInOrderBySlaDeadlineAsc(technicianId, OPEN_STATES)
+        .stream()
+        .map(TicketJpaEntity::toDomain)
+        .toList();
+  }
+
+  @Override
   public boolean existsOpenFor(UUID vehicleId) {
     return repository.existsByVehicleIdAndStateIn(vehicleId, OPEN_STATES);
   }
