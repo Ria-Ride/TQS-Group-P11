@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -14,19 +13,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
-import pt.ua.deti.tqs.p11.domain.billing.Money;
 import pt.ua.deti.tqs.p11.domain.fleet.BatteryLevel;
-import pt.ua.deti.tqs.p11.domain.fleet.BatteryRule;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleState;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
+import pt.ua.deti.tqs.p11.domain.rules.RulesOfUse;
+import pt.ua.deti.tqs.p11.support.TestRules;
 
 /**
  * Whether a booking can be created (BR1, BR2, BR4, BR5, BR6), for immediate use (US04) and later
- * for future bookings (US05). The rules are parameters, so these tests do not depend on the seeded
- * defaults. When several rules fail, the first one in this order is reported: duration, vehicle,
- * Pass, overlap.
+ * for future bookings (US05). The rules of use are given (TestRules), so these tests do not depend
+ * on the seeded version. When several rules fail, the first one in this order is reported:
+ * duration, vehicle, Pass, overlap.
  */
 class BookingPolicyTest {
 
@@ -34,20 +33,13 @@ class BookingPolicyTest {
   private static final UUID ANA = UUID.randomUUID();
   private static final UUID HUB = UUID.randomUUID();
   private static final UUID OTHER_BIKE = UUID.randomUUID();
-  private static final UsageRules RULES =
-      new UsageRules(
-          Duration.ofHours(4),
-          Map.of(VehicleType.E_BIKE, Money.of("30.00"), VehicleType.E_SCOOTER, Money.of("50.00")),
-          Duration.ofMinutes(15),
-          Duration.ofMinutes(10),
-          Duration.ofMinutes(15),
-          Money.of("2.00"));
+  /**
+   * Longest booking 4 hours; BR1: a 20% floor plus 5% per started 30 minutes, for both types;
+   * deposits 30.00 (E_BIKE) and 50.00 (E_SCOOTER).
+   */
+  private static final RulesOfUse RULES = TestRules.bookingRules();
 
-  /** BR1: a 20% floor plus 5% per started 30 minutes, for both types. */
-  private static final BatteryRule BATTERY =
-      new BatteryRule(BatteryLevel.of(20), Map.of(VehicleType.E_BIKE, 5, VehicleType.E_SCOOTER, 5));
-
-  private final BookingPolicy policy = new BookingPolicy(RULES, BATTERY);
+  private final BookingPolicy policy = new BookingPolicy(RULES);
 
   // ------------------------------------------------------------- fixtures
 
@@ -81,12 +73,18 @@ class BookingPolicyTest {
 
   private static Booking active(Instant start, Instant end) {
     return Booking.startNow(
-        UUID.randomUUID(), otherBikeTerms(start, end), RULES.forType(VehicleType.E_BIKE), "au_1");
+        UUID.randomUUID(),
+        otherBikeTerms(start, end),
+        BookingRules.of(RULES, VehicleType.E_BIKE),
+        "au_1");
   }
 
   private static Booking reserved(Instant start, Instant end) {
     return Booking.reserve(
-        UUID.randomUUID(), otherBikeTerms(start, end), RULES.forType(VehicleType.E_BIKE), "au_2");
+        UUID.randomUUID(),
+        otherBikeTerms(start, end),
+        BookingRules.of(RULES, VehicleType.E_BIKE),
+        "au_2");
   }
 
   /** A ride of the bike from now, with the day pass and no other booking. */
@@ -101,6 +99,13 @@ class BookingPolicyTest {
   }
 
   // ------------------------------------------------------------- a valid booking
+
+  /** BR21: a new booking keeps the deposit of its type and the shared rules of this version. */
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(VehicleType.class)
+  void bookingRules_areThoseOfTheTypeInTheRulesChecked(VehicleType type) {
+    assertThat(policy.bookingRules(type)).isEqualTo(BookingRules.of(RULES, type));
+  }
 
   @Test
   void check_validRequest_returnsThePassThatCoversIt() {

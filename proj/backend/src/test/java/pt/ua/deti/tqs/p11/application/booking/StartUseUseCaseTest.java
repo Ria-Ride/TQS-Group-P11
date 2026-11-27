@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -45,19 +44,20 @@ import pt.ua.deti.tqs.p11.domain.booking.Booking;
 import pt.ua.deti.tqs.p11.domain.booking.BookingPolicy;
 import pt.ua.deti.tqs.p11.domain.booking.BookingRefusal;
 import pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException;
+import pt.ua.deti.tqs.p11.domain.booking.BookingRules;
 import pt.ua.deti.tqs.p11.domain.booking.BookingState;
 import pt.ua.deti.tqs.p11.domain.booking.BookingTerms;
 import pt.ua.deti.tqs.p11.domain.booking.PassCoverage;
-import pt.ua.deti.tqs.p11.domain.booking.UsageRules;
 import pt.ua.deti.tqs.p11.domain.fleet.BatteryLevel;
-import pt.ua.deti.tqs.p11.domain.fleet.BatteryRule;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleState;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleStateChange;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
+import pt.ua.deti.tqs.p11.domain.rules.RulesOfUse;
 import pt.ua.deti.tqs.p11.domain.user.EmailAddress;
 import pt.ua.deti.tqs.p11.domain.user.User;
+import pt.ua.deti.tqs.p11.support.TestRules;
 
 /**
  * Starting an immediate use (US04). Which requests the rules accept is tested in BookingPolicyTest;
@@ -79,16 +79,8 @@ class StartUseUseCaseTest {
   private static final FleetCode BIKE_CODE = FleetCode.of("bike-0001");
   private static final User ANA_ACCOUNT =
       User.guest(ANA, "Ana Lopes", new EmailAddress("ana.lopes@example.com"), "hash");
-  private static final UsageRules RULES =
-      new UsageRules(
-          Duration.ofHours(4),
-          Map.of(VehicleType.E_BIKE, Money.of("30.00"), VehicleType.E_SCOOTER, Money.of("50.00")),
-          Duration.ofMinutes(15),
-          Duration.ofMinutes(10),
-          Duration.ofMinutes(15),
-          Money.of("2.00"));
-  private static final BatteryRule BATTERY =
-      new BatteryRule(BatteryLevel.of(20), Map.of(VehicleType.E_BIKE, 5, VehicleType.E_SCOOTER, 5));
+  /** Longest booking 4 hours; 20% + 5% per started 30 minutes; deposits 30.00 and 50.00. */
+  private static final RulesOfUse RULES = TestRules.bookingRules();
   private static final PassCoverage DAY_PASS =
       new PassCoverage(
           PASS_ID,
@@ -126,7 +118,7 @@ class StartUseUseCaseTest {
             payments,
             gateway,
             commands,
-            () -> new BookingPolicy(RULES, BATTERY),
+            () -> new BookingPolicy(RULES),
             transactions,
             clock,
             ids::next);
@@ -180,7 +172,7 @@ class StartUseUseCaseTest {
     assertThat(booking.terms())
         .isEqualTo(
             new BookingTerms(ANA, BIKE_ID, PASS_ID, HUB_ID, NOW, NOW.plus(Duration.ofMinutes(60))));
-    assertThat(booking.rules()).isEqualTo(RULES.forType(VehicleType.E_BIKE));
+    assertThat(booking.rules()).isEqualTo(BookingRules.of(RULES, VehicleType.E_BIKE));
     assertThat(booking.depositReference()).isEqualTo("au_fake");
     verify(bookings).save(booking);
   }
@@ -362,7 +354,7 @@ class StartUseUseCaseTest {
             UUID.randomUUID(),
             new BookingTerms(
                 ANA, UUID.randomUUID(), PASS_ID, HUB_ID, NOW, NOW.plus(Duration.ofMinutes(30))),
-            RULES.forType(VehicleType.E_BIKE),
+            BookingRules.of(RULES, VehicleType.E_BIKE),
             "au_other");
     when(bookings.findOngoingByAccount(ANA)).thenReturn(List.of(), List.of(otherRide));
     givenTheRowsAreLocked(bike);

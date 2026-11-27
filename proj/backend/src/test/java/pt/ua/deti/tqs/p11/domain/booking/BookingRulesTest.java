@@ -5,7 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import pt.ua.deti.tqs.p11.domain.billing.Money;
+import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
+import pt.ua.deti.tqs.p11.domain.rules.RulesOfUse;
+import pt.ua.deti.tqs.p11.support.TestRules;
 
 /**
  * BR21: the rules of use a booking keeps from the moment it is created, so later changes by the
@@ -28,6 +33,16 @@ class BookingRulesTest {
     assertThat(rules.overtimeGrace()).isEqualTo(GRACE);
     assertThat(rules.overtimeBlock()).isEqualTo(BLOCK);
     assertThat(rules.overtimePricePerBlock()).isEqualTo(PRICE);
+  }
+
+  /** BR21: a new booking keeps its type's deposit and the shared rules of the version in force. */
+  @ParameterizedTest(name = "{0}: deposit {1}")
+  @CsvSource({"E_BIKE, 30.00", "E_SCOOTER, 50.00"})
+  void of_keepsTheDepositOfTheTypeAndTheSharedRules(VehicleType type, String deposit) {
+    RulesOfUse inForce = TestRules.bookingRules();
+
+    assertThat(BookingRules.of(inForce, type))
+        .isEqualTo(new BookingRules(Money.of(deposit), WINDOW, GRACE, BLOCK, PRICE));
   }
 
   @Test
