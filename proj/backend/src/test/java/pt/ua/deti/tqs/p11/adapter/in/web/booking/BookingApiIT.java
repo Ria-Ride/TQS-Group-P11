@@ -31,10 +31,12 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.client.RestClient;
 import pt.ua.deti.tqs.p11.TestcontainersConfiguration;
+import pt.ua.deti.tqs.p11.application.rules.RulesOfUseRepository;
 import pt.ua.deti.tqs.p11.support.ApiClient;
 import pt.ua.deti.tqs.p11.support.ApiClient.Registered;
 import pt.ua.deti.tqs.p11.support.FleetApi;
 import pt.ua.deti.tqs.p11.support.PaymentGatewayContainer;
+import pt.ua.deti.tqs.p11.support.TestRules;
 
 /**
  * POST /bookings for an immediate start (US04) over HTTP, with a real database and the simulated
@@ -62,6 +64,7 @@ class BookingApiIT {
   private int port;
 
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private RulesOfUseRepository rulesOfUse;
 
   private RestClient http;
   private FleetApi operator;
@@ -84,11 +87,16 @@ class BookingApiIT {
     jdbc.update("DELETE FROM vehicles WHERE code LIKE " + CODES);
     jdbc.update("DELETE FROM hubs WHERE code LIKE " + CODES);
     jdbc.update("DELETE FROM users WHERE email LIKE " + EMAILS);
+    jdbc.update("DELETE FROM rules_of_use_vehicle_types WHERE version > 1");
+    jdbc.update("DELETE FROM rules_of_use WHERE version > 1");
   }
 
   @BeforeEach
   void aTouristWithAPassAndAnAvailableBike() {
     removeTheRowsOfThisTest();
+    // The rules in force are those the tests are written with (4 h, 30.00/50.00), not the seeded
+    // version 1 that the client manager may change (US14).
+    rulesOfUse.save(TestRules.bookingRules(2, Instant.now()));
     http = ApiClient.forPort(port);
     Registered ops =
         ApiClient.registerGuest(http, "Ops Tester", "ops.bookingapi@example.com", "Passw0rd!");

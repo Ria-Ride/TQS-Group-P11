@@ -4,18 +4,20 @@ Feature: Start an immediate use of an available vehicle (US04)
   I want to start an immediate use of an available vehicle
   So that I can ride right away and know the charges upfront
 
-  # Seeded rules of use (until US14): maxBookingDuration is 4 hours; the battery a ride needs is the
-  # 20% floor plus 5% per started 30 minutes (BR1). The deposit is 30.00 EUR for an E_BIKE and
-  # 50.00 EUR for an E_SCOOTER (BR11). The tourist's test card at the simulated gateway decides
-  # whether the deposit is authorized, declined or never answered; a start uses an approving card
-  # unless the step says otherwise.
+  # The rules of use in force are those of the booking tests (TestRules), saved as a new version
+  # over the seeded one, which the client manager may change (US14): maxBookingDuration is 4 hours;
+  # the battery a ride needs is the 20% floor plus 5% per started 30 minutes (BR1). The deposit is
+  # 30.00 EUR for an E_BIKE and 50.00 EUR for an E_SCOOTER (BR11). The tourist's test card at the
+  # simulated gateway decides whether the deposit is authorized, declined or never answered; a
+  # start uses an approving card unless the step says otherwise.
   # The Pass used is chosen by the platform: one valid now that allows the vehicle type. The planned
   # end must not be after the Pass's validTo (BR4).
   # A Reserved Booking cannot be created yet (US05), so BR6 is shown here with an Active one.
   # Battery levels and vehicle states are written to the database as a telemetry update would.
 
   Background:
-    Given tourist "Ana" is logged in
+    Given the rules of use in force are those of the booking tests
+    And tourist "Ana" is logged in
     And hub "hub-03" exists
     And hub "hub-03" holds these available vehicles:
       | code         | type      | battery |

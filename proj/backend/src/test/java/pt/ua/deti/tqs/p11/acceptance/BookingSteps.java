@@ -7,6 +7,7 @@ import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5Client;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
+import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -33,9 +34,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestClient;
+import pt.ua.deti.tqs.p11.application.rules.RulesOfUseRepository;
 import pt.ua.deti.tqs.p11.support.ApiClient;
 import pt.ua.deti.tqs.p11.support.ApiClient.Registered;
 import pt.ua.deti.tqs.p11.support.FleetApi;
+import pt.ua.deti.tqs.p11.support.TestRules;
 
 /**
  * Steps for US04 (KAN-56), run against the real API, database, MQTT broker and simulated payment
@@ -57,6 +60,7 @@ public class BookingSteps {
   private int port;
 
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private RulesOfUseRepository rulesOfUse;
   @Autowired private PassPurchaseSteps passSteps;
 
   private RestClient http;
@@ -92,7 +96,24 @@ public class BookingSteps {
     jdbc.update("DELETE FROM pass_types WHERE code LIKE 'TEST_%'");
   }
 
+  /** Back to the seeded rules of use, for the scenarios of other stories. */
+  @After("@REQ_KAN-56")
+  public void restoreTheSeededRules() {
+    removeTheLaterRules();
+  }
+
+  @Given("the rules of use in force are those of the booking tests")
+  public void theRulesOfTheBookingTests() {
+    removeTheLaterRules();
+    rulesOfUse.save(TestRules.bookingRules(2, Instant.now()));
+  }
+
   // ------------------------------------------------------------- helpers
+
+  private void removeTheLaterRules() {
+    jdbc.update("DELETE FROM rules_of_use_vehicle_types WHERE version > 1");
+    jdbc.update("DELETE FROM rules_of_use WHERE version > 1");
+  }
 
   private static synchronized Mqtt5BlockingClient.Mqtt5Publishes unlocks() {
     if (unlocks == null) {
