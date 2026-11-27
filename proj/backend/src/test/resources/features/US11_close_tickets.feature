@@ -83,7 +83,7 @@ Feature: Field technicians see their tickets and close them (US11)
     Given the simulator has reported fault "BRAKE_WEAR" for "bike-0009" at "2026-11-10T10:00:00Z"
     And the ticket for fault "BRAKE_WEAR" of vehicle "bike-0009" is assigned to "tiago.lopes@example.com"
     When "ana.matos@example.com" starts the ticket for fault "BRAKE_WEAR" of vehicle "bike-0009"
-    Then the start is refused because the ticket is not theirs
+    Then starting the ticket is refused because it is not theirs
     Given "tiago.lopes@example.com" has started the ticket for fault "BRAKE_WEAR" of vehicle "bike-0009"
     When "ana.matos@example.com" closes the ticket for fault "BRAKE_WEAR" of vehicle "bike-0009" recording "Replaced brake pads"
     Then the closing is refused because the ticket is not theirs
