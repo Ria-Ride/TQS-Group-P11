@@ -64,7 +64,11 @@ class TicketPersistenceAdapter implements TicketRepository {
 
   @Override
   public List<MaintenanceTicket> findOpenAssignedTo(UUID technicianId) {
-    throw new UnsupportedOperationException("US11");
+    return repository
+        .findByTechnicianIdAndStateInOrderBySlaDeadlineAsc(technicianId, OPEN_STATES)
+        .stream()
+        .map(TicketJpaEntity::toDomain)
+        .toList();
   }
 
   @Override

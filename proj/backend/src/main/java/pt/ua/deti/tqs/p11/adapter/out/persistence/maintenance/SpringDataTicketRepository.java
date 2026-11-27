@@ -15,5 +15,9 @@ interface SpringDataTicketRepository extends JpaRepository<TicketJpaEntity, UUID
 
   List<TicketJpaEntity> findByStateInOrderBySlaDeadlineAsc(Collection<TicketState> states);
 
+  /** US11: uses the index on (technician_id, sla_deadline) of V9. */
+  List<TicketJpaEntity> findByTechnicianIdAndStateInOrderBySlaDeadlineAsc(
+      UUID technicianId, Collection<TicketState> states);
+
   boolean existsByVehicleIdAndStateIn(UUID vehicleId, Collection<TicketState> states);
 }
