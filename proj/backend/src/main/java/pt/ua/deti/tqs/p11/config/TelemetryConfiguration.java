@@ -2,6 +2,7 @@ package pt.ua.deti.tqs.p11.config;
 
 import java.time.Clock;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -32,15 +33,24 @@ class TelemetryConfiguration {
     return new TelemetryIngestionUseCase(vehicles, transactions, faults);
   }
 
-  /** Telemetry off: commands to vehicles are only logged (US04). */
+  /**
+   * Commands to vehicles (US04): over the telemetry connection when it exists (simulator contract),
+   * otherwise only logged. One bean for both cases, so there is a single VehicleCommandPort to
+   * inject.
+   */
   @Bean
-  @ConditionalOnProperty(
-      prefix = "app.telemetry",
-      name = "enabled",
-      havingValue = "false",
-      matchIfMissing = true)
-  VehicleCommandPort loggingVehicleCommands() {
-    return new LoggingVehicleCommands();
+  VehicleCommandPort vehicleCommands(
+      ObjectProvider<MqttTelemetryConnection> mqtt, TelemetryProperties properties, Clock clock) {
+    MqttTelemetryConnection connection = mqtt.getIfAvailable();
+    if (connection == null) {
+      return new LoggingVehicleCommands();
+    }
+    return new MqttVehicleCommandPublisher(
+        connection.client(),
+        properties.fleetId(),
+        properties.commandTtl(),
+        clock,
+        UUID::randomUUID);
   }
 
   @Configuration
@@ -63,18 +73,6 @@ class TelemetryConfiguration {
     @Bean
     MqttTelemetrySubscriber mqttTelemetrySubscriber(MqttTelemetryConnection connection) {
       return connection.subscriber();
-    }
-
-    /** Commands to vehicles over the telemetry connection (US04, simulator contract). */
-    @Bean
-    VehicleCommandPort mqttVehicleCommands(
-        MqttTelemetryConnection connection, TelemetryProperties properties, Clock clock) {
-      return new MqttVehicleCommandPublisher(
-          connection.client(),
-          properties.fleetId(),
-          properties.commandTtl(),
-          clock,
-          UUID::randomUUID);
     }
   }
 }
