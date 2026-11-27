@@ -181,11 +181,25 @@ public record Vehicle(
   }
 
   /**
-   * US04: the vehicle is handed to a tourist and leaves its hub. Whether it may be (battery, the
-   * booking rules) is checked by the caller on the locked vehicle.
+   * US04, US05: the vehicle is handed to a tourist and leaves its hub, from Available (immediate
+   * use) or Reserved (a reservation started). Whether it may be is checked by the caller on the
+   * locked vehicle.
    */
   public Vehicle startUse() {
     return transition(VehicleAction.START_USE, hubId);
+  }
+
+  /**
+   * US05: the vehicle is held at its hub for a booking that starts later. Whether it may be
+   * (battery, the booking rules) is checked by the caller on the locked vehicle.
+   */
+  public Vehicle reserve() {
+    return transition(VehicleAction.RESERVE, hubId);
+  }
+
+  /** US05: a reservation was cancelled or expired, so the vehicle is offered again at its hub. */
+  public Vehicle release() {
+    return transition(VehicleAction.RELEASE, hubId);
   }
 
   /**

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
 import pt.ua.deti.tqs.p11.application.billing.DepositRequest;
@@ -23,12 +24,12 @@ import pt.ua.deti.tqs.p11.domain.booking.BookingPolicy;
 import pt.ua.deti.tqs.p11.domain.booking.BookingRules;
 import pt.ua.deti.tqs.p11.domain.booking.BookingTerms;
 import pt.ua.deti.tqs.p11.domain.booking.PassCoverage;
-import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 
 /**
- * A tourist starts using an available vehicle right away (US04). Four steps, so that no database
- * lock is held while waiting for the gateway:
+ * A tourist books a vehicle: to start using it right away (US04, {@link #start}) or for a later
+ * period (US05, {@link #reserve}). Both take the same four steps, so that no database lock is held
+ * while waiting for the gateway:
  *
  * <ol>
  *   <li>The booking rules are checked without locks (BookingPolicy). A refused request holds no
@@ -38,10 +39,15 @@ import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
  *       be held), kept as declined, nothing created.
  *   <li>In one transaction, the account and then the vehicle are locked, the rules are checked
  *       again on the locked rows (another request may have won meanwhile: BR3, BR6), the vehicle
- *       goes InUse through the fleet (K3), and the Active booking and the held deposit are stored.
- *       If this fails, the deposit is given back.
- *   <li>Once committed, the vehicle is asked to unlock, without waiting for its answer.
+ *       changes through the fleet (K3), and the booking and the held deposit are stored. If this
+ *       fails, the deposit is given back.
+ *   <li>Once committed, an immediate use asks the vehicle to unlock, without waiting for its
+ *       answer. A reservation is unlocked later, when it is started.
  * </ol>
+ *
+ * <p>The two kinds differ only in three places, chosen by {@link Plan#immediate()}: which rules are
+ * checked (a reservation must start after now), what the vehicle becomes (InUse or Reserved) and
+ * the state of the booking (Active or Reserved).
  *
  * <p>Time comes from the injected clock; the rules come from the policy supplier on every request,
  * so a change by the client applies to the next booking (BR21).
@@ -88,7 +94,19 @@ public class StartUseUseCase {
     this.ids = Objects.requireNonNull(ids, "ids");
   }
 
+  /** What is being booked, whichever the kind; for an immediate use, start is now. */
+  private record Plan(
+      UUID account,
+      UUID vehicleId,
+      Instant now,
+      Instant start,
+      Instant end,
+      String paymentToken,
+      boolean immediate) {}
+
   /**
+   * US04: an immediate use.
+   *
    * @return the Active booking
    * @throws pt.ua.deti.tqs.p11.application.fleet.VehicleNotFoundException if there is no such
    *     vehicle
@@ -99,96 +117,148 @@ public class StartUseUseCase {
    */
   public Booking start(StartUseCommand command) {
     Instant now = clock.instant();
-    UUID account = command.accountId();
-    BookingPolicy policy = policies.get();
+    return book(
+        new Plan(
+            command.accountId(),
+            command.vehicleId(),
+            now,
+            now,
+            command.plannedEnd(),
+            command.paymentToken(),
+            true));
+  }
 
-    // Step 1: the rules, without locks.
-    Vehicle vehicle = fleet.get(command.vehicleId());
-    policy.check(
+  /**
+   * US05: a booking for a later period. The vehicle is held at its hub until the booking is started
+   * in its window (BR7), cancelled, or expires.
+   *
+   * @return the Reserved booking
+   * @throws pt.ua.deti.tqs.p11.application.fleet.VehicleNotFoundException if there is no such
+   *     vehicle
+   * @throws pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException with the rule that refuses,
+   *     START_NOT_IN_THE_FUTURE included, before or after the deposit was held
+   * @throws DepositDeclinedException if the gateway refused the deposit
+   * @throws DepositTimedOutException if the gateway gave no answer in time
+   */
+  public Booking reserve(ReserveCommand command) {
+    return book(
+        new Plan(
+            command.accountId(),
+            command.vehicleId(),
+            clock.instant(),
+            command.plannedStart(),
+            command.plannedEnd(),
+            command.paymentToken(),
+            false));
+  }
+
+  /** Steps 1 and 2: the rules without locks, then the deposit outside any transaction. */
+  private Booking book(Plan plan) {
+    BookingPolicy policy = policies.get();
+    Vehicle vehicle = fleet.get(plan.vehicleId());
+    check(
+        policy,
+        plan,
         vehicle,
-        now,
-        command.plannedEnd(),
-        passes.ofAccount(account),
-        bookings.findOngoingByAccount(account));
+        passes.ofAccount(plan.account()),
+        bookings.findOngoingByAccount(plan.account()));
     BookingRules rules = policy.bookingRules(vehicle.type());
     Money deposit = rules.deposit();
 
-    // Step 2: the deposit, outside any transaction.
     UUID paymentId = ids.get();
     DepositResult held =
-        gateway.authorize(new DepositRequest(paymentId, deposit, command.paymentToken()));
+        gateway.authorize(new DepositRequest(paymentId, deposit, plan.paymentToken()));
     return switch (held) {
       case DepositResult.Approved approved ->
-          create(command, now, policy, rules, vehicle.code(), paymentId, approved.reference());
+          create(plan, policy, rules, vehicle, paymentId, approved.reference());
       case DepositResult.Declined declined -> {
-        payments.save(Payment.depositDeclined(paymentId, account, deposit, declined.reason(), now));
+        payments.save(
+            Payment.depositDeclined(
+                paymentId, plan.account(), deposit, declined.reason(), plan.now()));
         throw new DepositDeclinedException(declined.reason());
       }
       case DepositResult.TimedOut timedOut -> {
         gateway.release(paymentId);
-        payments.save(Payment.depositDeclined(paymentId, account, deposit, TIMEOUT, now));
+        payments.save(
+            Payment.depositDeclined(paymentId, plan.account(), deposit, TIMEOUT, plan.now()));
         throw new DepositTimedOutException();
       }
     };
   }
 
+  /** The rules of the kind: a reservation must also start after now. */
+  private static PassCoverage check(
+      BookingPolicy policy,
+      Plan plan,
+      Vehicle vehicle,
+      List<PassCoverage> coverages,
+      List<Booking> ongoing) {
+    return plan.immediate()
+        ? policy.check(vehicle, plan.now(), plan.end(), coverages, ongoing)
+        : policy.checkReservation(
+            vehicle, plan.now(), plan.start(), plan.end(), coverages, ongoing);
+  }
+
   /** Steps 3 and 4: the locked change, then the unlock; the deposit is given back on failure. */
   private Booking create(
-      StartUseCommand command,
-      Instant now,
+      Plan plan,
       BookingPolicy policy,
       BookingRules rules,
-      FleetCode vehicleCode,
+      Vehicle vehicle,
       UUID paymentId,
       String reference) {
     Booking booking;
     try {
       booking =
           transactions.inTransaction(
-              () -> createOnLockedRows(command, now, policy, rules, paymentId, reference));
+              () -> createOnLockedRows(plan, policy, rules, paymentId, reference));
     } catch (RuntimeException lost) {
-      giveBack(command.accountId(), rules.deposit(), paymentId, reference);
+      giveBack(plan.account(), rules.deposit(), paymentId, reference);
       throw lost;
     }
-    commands.unlock(vehicleCode);
+    if (plan.immediate()) {
+      commands.unlock(vehicle.code());
+    }
     return booking;
   }
 
   /** Step 3: account then vehicle locked, rules checked again, everything stored together. */
   private Booking createOnLockedRows(
-      StartUseCommand command,
-      Instant now,
-      BookingPolicy policy,
-      BookingRules rules,
-      UUID paymentId,
-      String reference) {
-    UUID account = command.accountId();
+      Plan plan, BookingPolicy policy, BookingRules rules, UUID paymentId, String reference) {
+    UUID account = plan.account();
     users
         .findByIdForUpdate(account)
         .orElseThrow(() -> new IllegalStateException("No account " + account));
     List<PassCoverage> coverages = passes.ofAccount(account);
     List<Booking> ongoing = bookings.findOngoingByAccount(account);
     AtomicReference<PassCoverage> pass = new AtomicReference<>();
-    AtomicReference<java.util.UUID> startHub = new AtomicReference<>();
-    fleet.startUse(
-        command.vehicleId(),
+    AtomicReference<UUID> startHub = new AtomicReference<>();
+    Consumer<Vehicle> checkLocked =
         locked -> {
-          pass.set(policy.check(locked, now, command.plannedEnd(), coverages, ongoing));
+          pass.set(check(policy, plan, locked, coverages, ongoing));
           startHub.set(locked.currentHub().orElseThrow());
-        });
+        };
+    if (plan.immediate()) {
+      fleet.startUse(plan.vehicleId(), checkLocked);
+    } else {
+      fleet.reserve(plan.vehicleId(), checkLocked);
+    }
     BookingTerms terms =
         new BookingTerms(
             account,
-            command.vehicleId(),
+            plan.vehicleId(),
             pass.get().passId(),
             startHub.get(),
-            now,
-            command.plannedEnd());
-    Booking booking = Booking.startNow(ids.get(), terms, rules, reference);
+            plan.start(),
+            plan.end());
+    Booking booking =
+        plan.immediate()
+            ? Booking.startNow(ids.get(), terms, rules, reference)
+            : Booking.reserve(ids.get(), terms, rules, reference);
     bookings.save(booking);
     payments.save(
         Payment.depositAuthorized(
-            paymentId, account, rules.deposit(), reference, booking.id(), now));
+            paymentId, account, rules.deposit(), reference, booking.id(), plan.now()));
     return booking;
   }
 

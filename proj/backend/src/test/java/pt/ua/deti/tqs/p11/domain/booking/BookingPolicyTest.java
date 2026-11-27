@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import pt.ua.deti.tqs.p11.domain.fleet.BatteryLevel;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
@@ -366,5 +367,52 @@ class BookingPolicyTest {
     assertRefused(
         () -> policy.check(bike(), NOW, in(60), List.of(), List.of(riding)),
         BookingRefusal.NO_VALID_PASS);
+  }
+
+  // ------------------------------------------------------------- US05: a later start
+
+  @Test
+  void checkReservation_startOneSecondFromNow_isAccepted() {
+    PassCoverage pass = dayPass();
+    Instant start = NOW.plusSeconds(1);
+
+    assertThat(
+            policy.checkReservation(
+                bike(), NOW, start, start.plus(Duration.ofHours(1)), List.of(pass), List.of()))
+        .isEqualTo(pass);
+  }
+
+  /** A start now is an immediate use (US04), not a reservation. */
+  @ParameterizedTest(name = "start {0} s from now")
+  @ValueSource(longs = {0, -1, -3600})
+  void checkReservation_startNotAfterNow_isRefused(long seconds) {
+    Instant start = NOW.plusSeconds(seconds);
+
+    assertRefused(
+        () -> policy.checkReservation(bike(), NOW, start, in(60), List.of(dayPass()), List.of()),
+        BookingRefusal.START_NOT_IN_THE_FUTURE);
+  }
+
+  /** BR4 is checked at the planned start, not now: a Pass bought for tomorrow covers tomorrow. */
+  @Test
+  void checkReservation_passValidOnlyFromThePlannedStart_isAccepted() {
+    PassCoverage tomorrow = pass(in(24 * 60), in(48 * 60), VehicleType.E_BIKE);
+
+    assertThat(
+            policy.checkReservation(
+                bike(), NOW, in(24 * 60), in(25 * 60), List.of(tomorrow), List.of()))
+        .isEqualTo(tomorrow);
+  }
+
+  /** The other rules are those of check(); one of them shows they are applied. */
+  @Test
+  void checkReservation_overlappingReservation_isRefused() {
+    Booking later = reserved(in(60), in(120));
+
+    assertRefused(
+        () ->
+            policy.checkReservation(
+                bike(), NOW, in(90), in(150), List.of(dayPass()), List.of(later)),
+        BookingRefusal.OVERLAPPING_BOOKING);
   }
 }

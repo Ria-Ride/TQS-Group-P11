@@ -198,6 +198,65 @@ class BookingPersistenceAdapterIT {
     assertThat(bookings.findOngoingByAccount(UUID.randomUUID())).isEmpty();
   }
 
+  // ------------------------------------------------------------- US05 queries
+
+  private Booking reserved(Instant start, String depositReference) {
+    return Booking.reserve(
+        UUID.randomUUID(), terms(start, Duration.ofMinutes(60)), RULES, depositReference);
+  }
+
+  /** BR7: the candidates for expiry; whether each is past its window is decided by Booking. */
+  @Test
+  void findReservedStartingBefore_returnsOnlyReservedBookingsPlannedBeforeThatMoment() {
+    Booking due = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(due);
+    Instant afterItsStart = NOW.plus(Duration.ofHours(1)).plusSeconds(1);
+
+    assertThat(bookings.findReservedStartingBefore(afterItsStart)).containsExactly(due);
+    assertThat(bookings.findReservedStartingBefore(NOW.plus(Duration.ofHours(1)))).isEmpty();
+  }
+
+  @Test
+  void findReservedStartingBefore_leavesOutBookingsThatAreNotReserved() {
+    Booking cancelled = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(cancelled);
+    bookings.save(cancelled.cancel("plans changed"));
+    bookings.save(active(NOW, "au_2"));
+
+    assertThat(bookings.findReservedStartingBefore(NOW.plus(Duration.ofDays(1)))).isEmpty();
+  }
+
+  /** BR18: the reservation a fault of the vehicle cancels. */
+  @Test
+  void findReservedOfVehicle_findsOnlyItsReservedBooking() {
+    Booking held = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(held);
+
+    assertThat(bookings.findReservedOfVehicle(bike)).contains(held);
+    assertThat(bookings.findReservedOfVehicle(UUID.randomUUID())).isEmpty();
+  }
+
+  @Test
+  void findReservedOfVehicle_activeBookingOfTheVehicle_isNotAReservation() {
+    bookings.save(active(NOW, "au_1"));
+
+    assertThat(bookings.findReservedOfVehicle(bike)).isEmpty();
+  }
+
+  /** GET /bookings: every booking of the account, latest planned start first. */
+  @Test
+  void findByAccount_returnsEveryBookingOfTheAccountLatestFirst() {
+    Booking earlier = active(NOW, "au_1");
+    bookings.save(earlier);
+    Booking completed = earlier.complete(otherHub, NOW.plus(Duration.ofMinutes(70)));
+    bookings.save(completed);
+    Booking later = reserved(NOW.plus(Duration.ofHours(3)), "au_2");
+    bookings.save(later);
+
+    assertThat(bookings.findByAccount(ana)).containsExactly(later, completed);
+    assertThat(bookings.findByAccount(UUID.randomUUID())).isEmpty();
+  }
+
   // ------------------------------------------------------------- database rules
 
   /**

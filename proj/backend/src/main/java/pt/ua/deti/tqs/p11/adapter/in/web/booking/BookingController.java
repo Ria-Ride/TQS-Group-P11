@@ -5,44 +5,56 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import pt.ua.deti.tqs.p11.application.booking.ManageBookingUseCase;
+import pt.ua.deti.tqs.p11.application.booking.Requester;
 import pt.ua.deti.tqs.p11.application.booking.StartUseUseCase;
 import pt.ua.deti.tqs.p11.domain.booking.Booking;
 
 /**
- * Bookings (US04 to US06). Tourists (END_USER) start their own rides (SecurityConfiguration and the
- * access matrix, BR23); the account is always the caller's, so nobody books for someone else. The
- * rules live in the use case and the domain; this class only maps HTTP to them.
+ * Bookings (US04 to US06). Tourists (END_USER) book, start and cancel their own; an ADMIN may act
+ * on any booking (SecurityConfiguration and the access matrix, BR23). A new booking is always the
+ * caller's, so nobody books for someone else. The rules live in the use cases and the domain; this
+ * class only maps HTTP to them.
  */
 @RestController
-@Tag(name = "Bookings", description = "Immediate use of a vehicle (US04)")
+@Tag(name = "Bookings", description = "Immediate use (US04) and bookings for later (US05)")
 class BookingController {
 
-  private final StartUseUseCase startUse;
+  private static final String ADMIN = "ROLE_ADMIN";
 
-  BookingController(StartUseUseCase startUse) {
+  private final StartUseUseCase startUse;
+  private final ManageBookingUseCase manage;
+
+  BookingController(StartUseUseCase startUse, ManageBookingUseCase manage) {
     this.startUse = startUse;
+    this.manage = manage;
   }
 
   @PostMapping("/bookings")
   @Operation(
-      summary = "Start using an available vehicle now",
+      summary = "Start using an available vehicle now, or book it for later",
       description =
-          "Checks the rules of use (BR1, BR2, BR4 to BR6), holds the deposit of the vehicle's type"
-              + " (BR11) and, only then, puts the vehicle InUse and creates an Active booking."
-              + " Exactly one of several simultaneous requests for a vehicle succeeds (BR3). The"
-              + " vehicle is then asked to unlock.")
-  @ApiResponse(responseCode = "201", description = "Started; the booking is Active")
+          "Checks the rules of use (BR1, BR2, BR4 to BR6) and holds the deposit of the vehicle's"
+              + " type (BR11); only then the vehicle changes. Without plannedStart the vehicle goes"
+              + " InUse, the booking is Active and the vehicle is asked to unlock (US04). With"
+              + " plannedStart the vehicle and the booking are Reserved until the booking is"
+              + " started in its window, cancelled or expires (US05). Exactly one of several"
+              + " simultaneous requests for a vehicle succeeds (BR3).")
+  @ApiResponse(responseCode = "201", description = "Created; the booking is Active or Reserved")
   @ApiResponse(
       responseCode = "400",
       description =
-          "Invalid field: plannedEnd not after now, above the longest booking, or after the end of"
-              + " the Pass; or a missing field")
+          "Invalid field: plannedStart not in the future; plannedEnd not after the start, above"
+              + " the longest booking, or after the end of the Pass; or a missing field")
   @ApiResponse(responseCode = "402", description = "The deposit was declined; no booking")
   @ApiResponse(responseCode = "404", description = "No such vehicle")
   @ApiResponse(
@@ -53,15 +65,73 @@ class BookingController {
   @ApiResponse(
       responseCode = "504",
       description = "The deposit got no answer in time; no booking. Safe to try again")
-  ResponseEntity<BookingResponse> start(
+  ResponseEntity<BookingResponse> create(
       @Valid @RequestBody StartUseRequest request, Authentication caller) {
-    Booking booking = startUse.start(request.toCommand(accountOf(caller)));
+    UUID account = accountOf(caller);
+    Booking booking =
+        request.isForLater()
+            ? startUse.reserve(request.toReserveCommand(account))
+            : startUse.start(request.toCommand(account));
     return ResponseEntity.created(URI.create("/bookings/" + booking.id()))
         .body(BookingResponse.from(booking));
+  }
+
+  @GetMapping("/bookings")
+  @Operation(summary = "The caller's bookings, latest planned start first")
+  @ApiResponse(responseCode = "200", description = "The bookings; empty if none")
+  List<BookingResponse> list(Authentication caller) {
+    return manage.listOf(accountOf(caller)).stream().map(BookingResponse::from).toList();
+  }
+
+  @GetMapping("/bookings/{id}")
+  @Operation(summary = "One of the caller's bookings")
+  @ApiResponse(responseCode = "200", description = "The booking")
+  @ApiResponse(responseCode = "403", description = "The booking is another account's (BR23)")
+  @ApiResponse(responseCode = "404", description = "No such booking")
+  BookingResponse get(@PathVariable UUID id, Authentication caller) {
+    return BookingResponse.from(manage.get(id, requester(caller)));
+  }
+
+  @PostMapping("/bookings/{id}/start")
+  @Operation(
+      summary = "Start a Reserved booking at its hub",
+      description =
+          "BR7: from plannedStart up to startWindowEndsAt, both included. The booking becomes"
+              + " Active, the vehicle InUse, and the vehicle is asked to unlock. The deposit stays"
+              + " held until the ride ends.")
+  @ApiResponse(responseCode = "200", description = "Started; the booking is Active")
+  @ApiResponse(responseCode = "403", description = "The booking is another account's (BR23)")
+  @ApiResponse(responseCode = "404", description = "No such booking")
+  @ApiResponse(
+      responseCode = "409",
+      description = "booking: not Reserved, before its planned start, or after its start window")
+  BookingResponse start(@PathVariable UUID id, Authentication caller) {
+    return BookingResponse.from(manage.start(id, requester(caller)));
+  }
+
+  @PostMapping("/bookings/{id}/cancel")
+  @Operation(
+      summary = "Cancel a Reserved booking",
+      description =
+          "BR13: the booking is Cancelled, the vehicle Available again and the whole deposit is"
+              + " given back. Only a Reserved booking can be cancelled.")
+  @ApiResponse(responseCode = "200", description = "Cancelled")
+  @ApiResponse(responseCode = "403", description = "The booking is another account's (BR23)")
+  @ApiResponse(responseCode = "404", description = "No such booking")
+  @ApiResponse(responseCode = "409", description = "booking: not Reserved")
+  BookingResponse cancel(@PathVariable UUID id, Authentication caller) {
+    return BookingResponse.from(manage.cancel(id, requester(caller)));
   }
 
   /** The access token's subject is the account id (ActiveAccountAuthenticationConverter). */
   private static UUID accountOf(Authentication caller) {
     return UUID.fromString(caller.getName());
+  }
+
+  /** BR23: an ADMIN may act on any booking (access matrix); anyone else on their own. */
+  private static Requester requester(Authentication caller) {
+    boolean admin =
+        caller.getAuthorities().stream().anyMatch(role -> ADMIN.equals(role.getAuthority()));
+    return new Requester(accountOf(caller), admin);
   }
 }

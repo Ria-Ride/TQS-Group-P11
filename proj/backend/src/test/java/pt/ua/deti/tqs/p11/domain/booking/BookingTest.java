@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import pt.ua.deti.tqs.p11.domain.billing.Money;
 
@@ -99,6 +100,57 @@ class BookingTest {
     assertThat(started.startedAt()).isEqualTo(at);
     assertThat(started.terms()).isEqualTo(reserved().terms());
   }
+
+  // ------------------------------------------------------------- start window (BR7)
+
+  /** reserved() starts at NOW + 1 h; its window is 15 minutes. */
+  private static final Instant PLANNED_START = NOW.plus(Duration.ofHours(1));
+
+  @ParameterizedTest(name = "started {0} s after the planned start")
+  @ValueSource(longs = {0, 1, 899, 900})
+  void start_fromThePlannedStartToTheEndOfTheWindow_isAccepted(long secondsLate) {
+    Instant at = PLANNED_START.plusSeconds(secondsLate);
+
+    assertThat(reserved().start(at).startedAt()).isEqualTo(at);
+  }
+
+  @Test
+  void start_beforeThePlannedStart_isRefusedAsTooEarly() {
+    Booking booking = reserved();
+    Instant oneSecondEarly = PLANNED_START.minusSeconds(1);
+
+    assertThatThrownBy(() -> booking.start(oneSecondEarly))
+        .isInstanceOfSatisfying(
+            BookingRefusedException.class,
+            e -> assertThat(e.reason()).isEqualTo(BookingRefusal.TOO_EARLY_TO_START));
+  }
+
+  @Test
+  void start_oneSecondAfterTheWindow_isRefusedAsTooLate() {
+    Booking booking = reserved();
+    Instant late = PLANNED_START.plus(Duration.ofMinutes(15)).plusSeconds(1);
+
+    assertThatThrownBy(() -> booking.start(late))
+        .isInstanceOfSatisfying(
+            BookingRefusedException.class,
+            e -> assertThat(e.reason()).isEqualTo(BookingRefusal.START_WINDOW_PASSED));
+  }
+
+  @ParameterizedTest(name = "{0} s after the planned start: overdue {1}")
+  @CsvSource({"-60, false", "0, false", "900, false", "901, true", "86400, true"})
+  void isOverdue_reservedBooking_onlyAfterItsWindow(long secondsLate, boolean overdue) {
+    assertThat(reserved().isOverdue(PLANNED_START.plusSeconds(secondsLate))).isEqualTo(overdue);
+  }
+
+  @Test
+  void isOverdue_bookingThatIsNotReserved_isNever() {
+    Instant muchLater = PLANNED_START.plus(Duration.ofDays(1));
+
+    assertThat(active().isOverdue(muchLater)).isFalse();
+    assertThat(reserved().cancel("plans changed").isOverdue(muchLater)).isFalse();
+  }
+
+  // ------------------------------------------------------------- other transitions
 
   @Test
   void complete_activeBooking_recordsTheEndAndTheHub() {

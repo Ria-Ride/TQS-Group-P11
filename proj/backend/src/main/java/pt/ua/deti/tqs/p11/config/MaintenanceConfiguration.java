@@ -20,15 +20,6 @@ import pt.ua.deti.tqs.p11.application.user.UserRepository;
 @EnableConfigurationProperties(MaintenanceProperties.class)
 class MaintenanceConfiguration {
 
-  /**
-   * Bookings arrive with US05, which replaces this bean with one that cancels the Reserved booking
-   * and releases its deposit. Until then no vehicle can be Reserved, so there is nothing to cancel.
-   */
-  @Bean
-  FaultBookingCancellation faultBookingCancellation() {
-    return vehicleId -> {};
-  }
-
   /** BR16: fleet asks whether a vehicle may be activated; maintenance answers from its tickets. */
   @Bean
   OpenTickets openTickets(TicketRepository tickets) {

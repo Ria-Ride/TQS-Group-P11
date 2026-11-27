@@ -98,20 +98,47 @@ public class VehicleLifecycleUseCase {
 
   /**
    * US04: hands the vehicle to a booking, as one atomic change (K3). The vehicle is locked, then
-   * {@code check} runs on it as it is now (the booking rules: state, battery, overlap), then it
-   * goes from Available to InUse and the change is recorded. When called inside the booking's own
-   * transaction, the booking and the vehicle are committed together.
+   * {@code check} runs on it as it is now (the booking rules: state, battery, overlap; or, for a
+   * reservation, its start window), then it goes from Available or Reserved (US05) to InUse and the
+   * change is recorded. When called inside the booking's own transaction, the booking and the
+   * vehicle are committed together.
    *
    * @param check throws to refuse; nothing is saved or recorded then
    */
   public Vehicle startUse(UUID vehicleId, Consumer<Vehicle> check) {
+    return checkedChange(vehicleId, check, Vehicle::startUse);
+  }
+
+  /** A booking's change: the check runs on the locked vehicle, then the transition. */
+  private Vehicle checkedChange(
+      UUID vehicleId, Consumer<Vehicle> check, UnaryOperator<Vehicle> transition) {
     Objects.requireNonNull(check, "check");
     return change(
         vehicleId,
         vehicle -> {
           check.accept(vehicle);
-          return vehicle.startUse();
+          return transition.apply(vehicle);
         });
+  }
+
+  /**
+   * US05: holds the vehicle at its hub for a booking that starts later, as startUse does for an
+   * immediate one: locked, checked, then Available to Reserved, recorded.
+   *
+   * @param check throws to refuse; nothing is saved or recorded then
+   */
+  public Vehicle reserve(UUID vehicleId, Consumer<Vehicle> check) {
+    return checkedChange(vehicleId, check, Vehicle::reserve);
+  }
+
+  /**
+   * US05: gives a Reserved vehicle back to its hub when its booking is cancelled or expires.
+   *
+   * @param check runs on the locked vehicle before it changes (the booking is read again there);
+   *     throws to refuse, and nothing is saved or recorded then
+   */
+  public Vehicle release(UUID vehicleId, Consumer<Vehicle> check) {
+    return checkedChange(vehicleId, check, Vehicle::release);
   }
 
   public List<VehicleStateChange> history(UUID vehicleId) {

@@ -392,4 +392,92 @@ class StartUseUseCaseTest {
     assertThatThrownBy(() -> useCase.start(ride)).isInstanceOf(BookingRefusedException.class);
     verify(payments, never()).save(any());
   }
+
+  // ------------------------------------------------------------- US05: a later start
+
+  private static ReserveCommand reservationIn(int startMinutes, int endMinutes) {
+    return new ReserveCommand(
+        ANA,
+        BIKE_ID,
+        NOW.plus(Duration.ofMinutes(startMinutes)),
+        NOW.plus(Duration.ofMinutes(endMinutes)),
+        "tok_approve");
+  }
+
+  private Booking aValidReservation() {
+    Vehicle vehicle = available(VehicleType.E_BIKE);
+    givenTheRequestIsRead(vehicle);
+    givenTheRowsAreLocked(vehicle);
+    givenEverythingIsStored();
+    return useCase.reserve(reservationIn(60, 120));
+  }
+
+  /** BR2, BR11: Reserved, with the planned period, the rules of the type and the held deposit. */
+  @Test
+  void reserve_validRequest_createsAReservedBookingForThePlannedPeriod() {
+    Booking booking = aValidReservation();
+
+    assertThat(booking.id()).isEqualTo(BOOKING_ID);
+    assertThat(booking.state()).isEqualTo(BookingState.RESERVED);
+    assertThat(booking.startedAt()).isNull();
+    assertThat(booking.terms())
+        .isEqualTo(
+            new BookingTerms(
+                ANA,
+                BIKE_ID,
+                PASS_ID,
+                HUB_ID,
+                NOW.plus(Duration.ofMinutes(60)),
+                NOW.plus(Duration.ofMinutes(120))));
+    assertThat(booking.rules()).isEqualTo(BookingRules.of(RULES, VehicleType.E_BIKE));
+    verify(payments)
+        .save(
+            Payment.depositAuthorized(
+                PAYMENT_ID, ANA, Money.of("30.00"), "au_fake", BOOKING_ID, NOW));
+  }
+
+  @Test
+  void reserve_validRequest_reservesTheVehicleAtItsHubAndDoesNotUnlockIt() {
+    aValidReservation();
+
+    verify(vehicles)
+        .save(argThat(saved -> saved.state() == VehicleState.RESERVED && saved.hubId() != null));
+    verify(history)
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.RESERVED, NOW));
+    verifyNoInteractions(commands);
+  }
+
+  @Test
+  void reserve_startNow_isRefusedBeforeAnyMoneyIsHeld() {
+    givenTheRequestIsRead(available(VehicleType.E_BIKE));
+    ReserveCommand startsNow = reservationIn(0, 60);
+
+    assertThatThrownBy(() -> useCase.reserve(startsNow))
+        .isInstanceOfSatisfying(
+            BookingRefusedException.class,
+            e -> assertThat(e.reason()).isEqualTo(BookingRefusal.START_NOT_IN_THE_FUTURE));
+    assertThat(gateway.authorizations()).isEmpty();
+  }
+
+  /** BR3: reserved by someone else meanwhile; the deposit is given back. */
+  @Test
+  void reserve_vehicleTakenMeanwhile_releasesTheDepositAndCreatesNothing() {
+    givenTheRequestIsRead(available(VehicleType.E_BIKE));
+    givenTheRowsAreLocked(
+        new Vehicle(
+            BIKE_ID,
+            BIKE_CODE,
+            VehicleType.E_BIKE,
+            VehicleState.RESERVED,
+            HUB_ID,
+            BatteryLevel.of(100)));
+    ReserveCommand reservation = reservationIn(60, 120);
+
+    assertThatThrownBy(() -> useCase.reserve(reservation))
+        .isInstanceOfSatisfying(
+            BookingRefusedException.class,
+            e -> assertThat(e.reason()).isEqualTo(BookingRefusal.VEHICLE_NOT_AVAILABLE));
+    assertThat(gateway.releases()).containsExactly(PAYMENT_ID);
+    verify(bookings, never()).save(any());
+  }
 }

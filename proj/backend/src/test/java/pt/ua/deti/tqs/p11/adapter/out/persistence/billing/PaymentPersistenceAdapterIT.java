@@ -220,4 +220,32 @@ class PaymentPersistenceAdapterIT {
     assertThatThrownBy(() -> payments.save(second))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
+
+  // ------------------------------------------------------------- US05: give a deposit back
+
+  @Test
+  void findDepositOfBooking_readsTheHeldDepositBack() {
+    Payment held =
+        Payment.depositAuthorized(UUID.randomUUID(), ana, Money.of("30.00"), "au_1", booking, AT);
+    payments.save(held);
+
+    assertThat(payments.findDepositOfBooking(booking)).contains(held);
+  }
+
+  /** A release keeps the same payment, now RELEASED: one row per deposit. */
+  @Test
+  void findDepositOfBooking_afterTheRelease_readsTheReleasedDeposit() {
+    UUID id = UUID.randomUUID();
+    payments.save(Payment.depositAuthorized(id, ana, Money.of("30.00"), "au_1", booking, AT));
+    Payment released = Payment.depositReleased(id, ana, Money.of("30.00"), "au_1", booking, AT);
+
+    payments.save(released);
+
+    assertThat(payments.findDepositOfBooking(booking)).contains(released);
+  }
+
+  @Test
+  void findDepositOfBooking_bookingWithoutADeposit_isEmpty() {
+    assertThat(payments.findDepositOfBooking(UUID.randomUUID())).isEmpty();
+  }
 }

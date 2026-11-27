@@ -367,10 +367,71 @@ class VehicleLifecycleUseCaseTest {
     verifyNoInteractions(history);
   }
 
+  // ------------------------------------------------------------- US05: reservations
+
   @Test
-  void startUse_vehicleNotAvailable_isRefusedAndNothingIsSaved() {
+  void reserve_availableVehicle_isReservedAtItsHubAndTheChangeIsRecorded() {
+    when(vehicles.findByIdForUpdate(BIKE_ID))
+        .thenReturn(Optional.of(bikeAtHub03(VehicleState.AVAILABLE)));
+    when(vehicles.save(any())).then(returnsFirstArg());
+
+    Vehicle vehicle = useCase.reserve(BIKE_ID, locked -> {});
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.RESERVED);
+    assertThat(vehicle.currentHub()).isPresent();
+    verify(history)
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.AVAILABLE, VehicleState.RESERVED, T0));
+  }
+
+  @Test
+  void startUse_reservedVehicle_isInUseAndTheChangeIsRecorded() {
     when(vehicles.findByIdForUpdate(BIKE_ID))
         .thenReturn(Optional.of(bikeAtHub03(VehicleState.RESERVED)));
+    when(vehicles.save(any())).then(returnsFirstArg());
+
+    Vehicle vehicle = useCase.startUse(BIKE_ID, locked -> {});
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.IN_USE);
+    verify(history)
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.RESERVED, VehicleState.IN_USE, T0));
+  }
+
+  @Test
+  void release_reservedVehicle_isAvailableAgainAndTheChangeIsRecorded() {
+    when(vehicles.findByIdForUpdate(BIKE_ID))
+        .thenReturn(Optional.of(bikeAtHub03(VehicleState.RESERVED)));
+    when(vehicles.save(any())).then(returnsFirstArg());
+
+    Vehicle vehicle = useCase.release(BIKE_ID, locked -> {});
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.AVAILABLE);
+    verify(history)
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.RESERVED, VehicleState.AVAILABLE, T0));
+  }
+
+  /** The booking refuses on the locked vehicle (it was started meanwhile): nothing is saved. */
+  @Test
+  void release_checkRefuses_savesAndRecordsNothing() {
+    when(vehicles.findByIdForUpdate(BIKE_ID))
+        .thenReturn(Optional.of(bikeAtHub03(VehicleState.RESERVED)));
+    IllegalStateException refusal = new IllegalStateException("no longer overdue");
+
+    assertThatThrownBy(() ->
+            useCase.release(
+                BIKE_ID,
+                locked -> {
+                  throw refusal;
+                }))
+        .isSameAs(refusal);
+    verify(vehicles, never()).save(any());
+    verifyNoInteractions(history);
+  }
+
+  /** US05: a Reserved vehicle may be started too, by its booking (Product Specs 3.3). */
+  @Test
+  void startUse_maintenanceVehicle_isRefusedAndNothingIsSaved() {
+    when(vehicles.findByIdForUpdate(BIKE_ID))
+        .thenReturn(Optional.of(bikeAtHub03(VehicleState.MAINTENANCE)));
 
     assertThatThrownBy(() -> useCase.startUse(BIKE_ID, locked -> {}))
         .isInstanceOf(ForbiddenTransitionException.class);

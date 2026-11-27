@@ -52,8 +52,10 @@ public enum VehicleState {
       case START_MOVE -> to(IN_TRANSIT, EnumSet.of(AVAILABLE));
       case CONFIRM_ARRIVAL -> to(AVAILABLE, EnumSet.of(IN_TRANSIT));
       case RETIRE -> to(RETIRED, EnumSet.of(DEACTIVATED, AVAILABLE, MAINTENANCE));
-      case START_USE -> to(IN_USE, EnumSet.of(AVAILABLE));
+      case START_USE -> to(IN_USE, EnumSet.of(AVAILABLE, RESERVED));
       case REPORT_FAULT -> to(MAINTENANCE, EnumSet.of(AVAILABLE, RESERVED));
+      case RESERVE -> to(RESERVED, EnumSet.of(AVAILABLE));
+      case RELEASE -> to(AVAILABLE, EnumSet.of(RESERVED));
     };
   }
 

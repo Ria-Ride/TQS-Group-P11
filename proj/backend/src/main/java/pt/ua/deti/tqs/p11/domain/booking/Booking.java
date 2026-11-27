@@ -70,10 +70,28 @@ public record Booking(
         id, terms, rules, depositReference, BookingState.RESERVED, null, null, null, null);
   }
 
-  /** Whether it may start now (start window, BR7) is checked by the caller, which has the clock. */
+  /**
+   * BR7: a reservation is started from its planned start up to the end of its start window, both
+   * included. The lifecycle is checked first, so a booking that is not Reserved is refused as such.
+   *
+   * @throws BookingTransitionNotAllowedException if the booking is not Reserved
+   * @throws BookingRefusedException TOO_EARLY_TO_START or START_WINDOW_PASSED outside the window
+   */
   public Booking start(Instant at) {
     Objects.requireNonNull(at, "at");
-    return with(state.after(BookingAction.START), at, null, null, null);
+    BookingState next = state.after(BookingAction.START);
+    if (at.isBefore(terms.plannedStart())) {
+      throw new BookingRefusedException(BookingRefusal.TOO_EARLY_TO_START);
+    }
+    if (at.isAfter(startWindowEnd())) {
+      throw new BookingRefusedException(BookingRefusal.START_WINDOW_PASSED);
+    }
+    return with(next, at, null, null, null);
+  }
+
+  /** BR7: the last moment a reservation can be started, kept with its rules (BR21). */
+  public Instant startWindowEnd() {
+    return terms.plannedStart().plus(rules.startWindow());
   }
 
   /** Whether the hub has a free slot (BR14) is checked by the caller, which knows the hub. */
@@ -81,6 +99,12 @@ public record Booking(
     Objects.requireNonNull(hubId, "hubId");
     Objects.requireNonNull(at, "at");
     return with(state.after(BookingAction.COMPLETE), startedAt, at, hubId, null);
+  }
+
+  /** BR7: a Reserved booking not started by the end of its window is due to expire. */
+  public boolean isOverdue(Instant at) {
+    Objects.requireNonNull(at, "at");
+    return state == BookingState.RESERVED && at.isAfter(startWindowEnd());
   }
 
   public Booking cancel(String reason) {

@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.adapter.out.persistence.booking;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +62,28 @@ class BookingPersistenceAdapter implements BookingRepository {
   @Override
   public List<Booking> findOngoingByAccount(UUID accountId) {
     return repository.findByAccountIdAndStateInOrderByPlannedStartAsc(accountId, ONGOING).stream()
+        .map(BookingJpaEntity::toDomain)
+        .toList();
+  }
+
+  @Override
+  public List<Booking> findReservedStartingBefore(Instant at) {
+    return repository.findByStateAndPlannedStartBefore(BookingState.RESERVED, at).stream()
+        .map(BookingJpaEntity::toDomain)
+        .toList();
+  }
+
+  /** At most one, by uk_bookings_ongoing_vehicle (BR3). */
+  @Override
+  public Optional<Booking> findReservedOfVehicle(UUID vehicleId) {
+    return repository
+        .findByVehicleIdAndState(vehicleId, BookingState.RESERVED)
+        .map(BookingJpaEntity::toDomain);
+  }
+
+  @Override
+  public List<Booking> findByAccount(UUID accountId) {
+    return repository.findByAccountIdOrderByPlannedStartDesc(accountId).stream()
         .map(BookingJpaEntity::toDomain)
         .toList();
   }
