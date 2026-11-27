@@ -14,4 +14,10 @@ public interface VehicleCommandPort {
    * already made, so a command that cannot be sent is only logged.
    */
   void unlock(FleetCode vehicle);
+
+  /**
+   * US06: asks the vehicle to lock and waits for its answer, up to a time the adapter sets. Never
+   * throws: a command that cannot be sent or gets no answer is {@link LockResult.NoAnswer}.
+   */
+  LockResult lock(FleetCode vehicle);
 }

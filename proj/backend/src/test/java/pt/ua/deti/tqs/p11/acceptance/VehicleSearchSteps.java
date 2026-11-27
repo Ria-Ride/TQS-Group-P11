@@ -109,6 +109,36 @@ public class VehicleSearchSteps {
     hubs.put(code, operator().hub(code, 10));
   }
 
+  /**
+   * US06: hubs at given positions (so "nearby" has a meaning), each holding that many vehicles
+   * (registered, so Deactivated; they take a slot all the same, BR14).
+   */
+  @Given("these hubs exist:")
+  public void theseHubsExist(DataTable table) {
+    for (Map<String, String> row : table.asMaps()) {
+      String code = row.get("code");
+      UUID id =
+          FleetApi.id(
+              FleetApi.created(
+                  operator()
+                      .registerHub(
+                          code,
+                          "Hub " + code,
+                          Double.parseDouble(row.get("latitude")),
+                          Double.parseDouble(row.get("longitude")),
+                          Integer.parseInt(row.get("capacity")))));
+      hubs.put(code, id);
+      for (int i = 1; i <= Integer.parseInt(row.get("vehicles")); i++) {
+        operator().bike("%s-held-%02d".formatted(code, i), id);
+      }
+    }
+  }
+
+  /** The id of a hub a step of this class created; for the steps of US06. */
+  UUID hubId(String code) {
+    return hub(code);
+  }
+
   @Given("hub {string} holds these available vehicles:")
   public void hubHoldsTheseAvailableVehicles(String hubCode, DataTable table) {
     for (Map<String, String> row : table.asMaps()) {

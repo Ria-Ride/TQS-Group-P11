@@ -203,6 +203,16 @@ public record Vehicle(
   }
 
   /**
+   * US06: the ride ends and the vehicle is offered again at the hub where it was left, which may
+   * not be the one it started from. Whether that hub has a free slot (BR14) is checked by the
+   * caller, which knows the hub.
+   */
+  public Vehicle endUse(UUID hubId) {
+    Objects.requireNonNull(hubId, "hubId");
+    return transition(VehicleAction.END_USE, hubId);
+  }
+
+  /**
    * BR18: a fault sends an Available or Reserved vehicle to maintenance, at the same hub. In any
    * other state the vehicle is kept as it is: an InUse ride is not interrupted, and a vehicle that
    * is not offered stays out of service. The fault itself is recorded by its ticket.

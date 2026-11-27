@@ -6,6 +6,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.ACTIVATE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.CONFIRM_ARRIVAL;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.DEACTIVATE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.END_USE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RELEASE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.REPORT_FAULT;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RESERVE;
@@ -51,6 +52,8 @@ class VehicleStateTest {
           arguments(AVAILABLE, RESERVE, RESERVED),
           arguments(RESERVED, START_USE, IN_USE),
           arguments(RESERVED, RELEASE, AVAILABLE),
+          // US06: a ride ends at a hub, where the vehicle is offered again.
+          arguments(IN_USE, END_USE, AVAILABLE),
           // BR18: a fault sends an Available or Reserved vehicle to maintenance (US10).
           arguments(AVAILABLE, REPORT_FAULT, MAINTENANCE),
           arguments(RESERVED, REPORT_FAULT, MAINTENANCE));

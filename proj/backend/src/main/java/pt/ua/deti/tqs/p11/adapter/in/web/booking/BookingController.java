@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import pt.ua.deti.tqs.p11.application.booking.EndUseUseCase;
 import pt.ua.deti.tqs.p11.application.booking.ManageBookingUseCase;
 import pt.ua.deti.tqs.p11.application.booking.Requester;
 import pt.ua.deti.tqs.p11.application.booking.StartUseUseCase;
@@ -26,17 +27,21 @@ import pt.ua.deti.tqs.p11.domain.booking.Booking;
  * class only maps HTTP to them.
  */
 @RestController
-@Tag(name = "Bookings", description = "Immediate use (US04) and bookings for later (US05)")
+@Tag(
+    name = "Bookings",
+    description = "Immediate use (US04), bookings for later (US05) and the end of a ride (US06)")
 class BookingController {
 
   private static final String ADMIN = "ROLE_ADMIN";
 
   private final StartUseUseCase startUse;
   private final ManageBookingUseCase manage;
+  private final EndUseUseCase endUse;
 
-  BookingController(StartUseUseCase startUse, ManageBookingUseCase manage) {
+  BookingController(StartUseUseCase startUse, ManageBookingUseCase manage, EndUseUseCase endUse) {
     this.startUse = startUse;
     this.manage = manage;
+    this.endUse = endUse;
   }
 
   @PostMapping("/bookings")
@@ -121,6 +126,34 @@ class BookingController {
   @ApiResponse(responseCode = "409", description = "booking: not Reserved")
   BookingResponse cancel(@PathVariable UUID id, Authentication caller) {
     return BookingResponse.from(manage.cancel(id, requester(caller)));
+  }
+
+  @PostMapping("/bookings/{id}/end")
+  @Operation(
+      summary = "End an Active ride at a hub",
+      description =
+          "BR14: the hub needs a free slot; it may be another than the start hub. The vehicle is"
+              + " asked to lock and its answer is waited for; then the vehicle is Available at the"
+              + " hub, the booking Completed, and the deposit settled: the overtime charge (BR12) is"
+              + " captured, at most the whole deposit, and the rest released (BR13). A full hub"
+              + " refuses, keeps the first refusal (fullHubAttemptAt) and lists nearbyHubs with"
+              + " room; ending at one of them within the repositioning window charges overtime"
+              + " only until that refusal (BR15).")
+  @ApiResponse(responseCode = "200", description = "Ended, with the charge and the settlement")
+  @ApiResponse(responseCode = "400", description = "hubId missing")
+  @ApiResponse(responseCode = "403", description = "The booking is another account's (BR23)")
+  @ApiResponse(responseCode = "404", description = "No such booking or hub")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "booking: not Active; hubId: the hub is full (nearbyHubs lists hubs with room);"
+              + " vehicleId: the vehicle could not be locked. The ride goes on")
+  @ApiResponse(
+      responseCode = "504",
+      description = "vehicleId: the vehicle did not answer the lock in time. The ride goes on")
+  BookingResponse end(
+      @PathVariable UUID id, @Valid @RequestBody EndUseRequest request, Authentication caller) {
+    return BookingResponse.from(endUse.end(id, request.hubId(), requester(caller)));
   }
 
   /** The access token's subject is the account id (ActiveAccountAuthenticationConverter). */

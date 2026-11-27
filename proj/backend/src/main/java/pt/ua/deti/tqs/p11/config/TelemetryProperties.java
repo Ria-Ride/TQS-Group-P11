@@ -13,6 +13,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param clientId empty to generate a unique one at start-up
  * @param fleetId the only fleet the platform listens to (simulator contract identifier)
  * @param commandTtl how long a command to a vehicle stays valid after it is sent (its expiresAt)
+ * @param commandResponseTimeout how long ending a ride waits for the vehicle to answer the lock
+ *     (US06); the simulator contract recommends 10 seconds
  */
 @ConfigurationProperties("app.telemetry")
 public record TelemetryProperties(
@@ -23,4 +25,5 @@ public record TelemetryProperties(
     @DefaultValue("") String password,
     @DefaultValue("") String clientId,
     @DefaultValue("fleet-01") String fleetId,
-    @DefaultValue("PT30S") Duration commandTtl) {}
+    @DefaultValue("PT30S") Duration commandTtl,
+    @DefaultValue("PT10S") Duration commandResponseTimeout) {}

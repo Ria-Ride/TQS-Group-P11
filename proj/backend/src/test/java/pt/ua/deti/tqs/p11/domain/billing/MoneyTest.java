@@ -56,4 +56,46 @@ class MoneyTest {
     assertThatThrownBy(() -> Money.of("10.00").minusPercent(percent))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  // ------------------------------------------------------------- US06: overtime and settlement
+
+  @ParameterizedTest(name = "{0} x {1} = {2}")
+  @CsvSource({"2.00, 0, 0.00", "2.00, 1, 2.00", "2.00, 17, 34.00", "1.50, 3, 4.50"})
+  void times_multipliesByAWholeNumber(String amount, long times, String expected) {
+    assertThat(Money.of(amount).times(times)).isEqualTo(Money.of(expected));
+  }
+
+  @Test
+  void times_negative_isRefused() {
+    Money price = Money.of("2.00");
+
+    assertThatThrownBy(() -> price.times(-1)).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @ParameterizedTest(name = "{0} - {1} = {2}")
+  @CsvSource({"30.00, 4.00, 26.00", "30.00, 30.00, 0.00", "30.00, 0.00, 30.00"})
+  void minus_subtractsUpToZero(String amount, String taken, String expected) {
+    assertThat(Money.of(amount).minus(Money.of(taken))).isEqualTo(Money.of(expected));
+  }
+
+  /** Money is never negative: taking more than there is is a bug in the caller. */
+  @Test
+  void minus_moreThanTheAmount_isRefused() {
+    Money deposit = Money.of("30.00");
+    Money charge = Money.of("30.01");
+
+    assertThatThrownBy(() -> deposit.minus(charge)).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @ParameterizedTest(name = "{0} at most {1} = {2}")
+  @CsvSource({"4.00, 30.00, 4.00", "34.00, 30.00, 30.00", "30.00, 30.00, 30.00"})
+  void atMost_capsTheAmount(String amount, String cap, String expected) {
+    assertThat(Money.of(amount).atMost(Money.of(cap))).isEqualTo(Money.of(expected));
+  }
+
+  @Test
+  void isZero_onlyForNoMoney() {
+    assertThat(Money.ZERO.isZero()).isTrue();
+    assertThat(Money.of("0.01").isZero()).isFalse();
+  }
 }

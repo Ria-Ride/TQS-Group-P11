@@ -5,7 +5,9 @@ import com.hivemq.client.mqtt.mqtt5.Mqtt5Client;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5ClientBuilder;
 import com.hivemq.client.mqtt.mqtt5.message.auth.Mqtt5SimpleAuth;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -24,6 +26,7 @@ public class MqttTelemetryConnection implements SmartLifecycle {
   private final Mqtt5AsyncClient client;
   private final MqttTelemetrySubscriber subscriber;
   private final String broker;
+  private final List<Runnable> onEveryConnection = new CopyOnWriteArrayList<>();
   private volatile boolean running;
 
   public MqttTelemetryConnection(
@@ -67,6 +70,15 @@ public class MqttTelemetryConnection implements SmartLifecycle {
   private void onConnected() {
     LOG.info("Connected to the MQTT broker at {}", broker);
     subscriber.subscribe();
+    onEveryConnection.forEach(Runnable::run);
+  }
+
+  /**
+   * US06: something else to do each time the connection is made, such as subscribing to the
+   * vehicles' answers to commands. Add it before the application starts.
+   */
+  public void onEveryConnection(Runnable action) {
+    onEveryConnection.add(action);
   }
 
   @Override

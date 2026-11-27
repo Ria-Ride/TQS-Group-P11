@@ -19,7 +19,15 @@ class TelemetryPropertiesTest {
         .bind("app.telemetry", TelemetryProperties.class)
         .orElseGet(() ->
             new TelemetryProperties(
-                false, "localhost", 1883, "", "", "", "fleet-01", Duration.ofSeconds(30)));
+                false,
+                "localhost",
+                1883,
+                "",
+                "",
+                "",
+                "fleet-01",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(10)));
   }
 
   @Test
@@ -34,6 +42,7 @@ class TelemetryPropertiesTest {
     assertThat(defaults.clientId()).isEmpty();
     assertThat(defaults.fleetId()).isEqualTo("fleet-01");
     assertThat(defaults.commandTtl()).isEqualTo(Duration.ofSeconds(30));
+    assertThat(defaults.commandResponseTimeout()).isEqualTo(Duration.ofSeconds(10));
   }
 
   @Test
@@ -48,7 +57,8 @@ class TelemetryPropertiesTest {
                 "app.telemetry.password", "secret",
                 "app.telemetry.client-id", "platform-1",
                 "app.telemetry.fleet-id", "fleet-02",
-                "app.telemetry.command-ttl", "PT10S"));
+                "app.telemetry.command-ttl", "PT10S",
+                "app.telemetry.command-response-timeout", "PT3S"));
 
     assertThat(properties)
         .isEqualTo(
@@ -60,6 +70,7 @@ class TelemetryPropertiesTest {
                 "secret",
                 "platform-1",
                 "fleet-02",
-                Duration.ofSeconds(10)));
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(3)));
   }
 }

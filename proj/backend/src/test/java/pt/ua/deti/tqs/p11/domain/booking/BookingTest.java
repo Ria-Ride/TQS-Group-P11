@@ -32,6 +32,7 @@ class BookingTest {
       new BookingRules(
           Money.of("30.00"),
           Duration.ofMinutes(15),
+          Duration.ofMinutes(15),
           Duration.ofMinutes(10),
           Duration.ofMinutes(15),
           Money.of("2.00"));
@@ -150,6 +151,102 @@ class BookingTest {
     assertThat(reserved().cancel("plans changed").isOverdue(muchLater)).isFalse();
   }
 
+  // ------------------------------------------------------------- US06: ending and charging
+
+  /** active() is planned to end at NOW + 60 min; its repositioning window is 15 minutes. */
+  private static final Instant PLANNED_END = NOW.plus(Duration.ofMinutes(60));
+
+  private static Instant minutesLate(long minutes) {
+    return PLANNED_END.plus(Duration.ofMinutes(minutes));
+  }
+
+  @Test
+  void recordFullHubAttempt_activeBooking_keepsTheMomentAndStaysActive() {
+    Booking tried = active().recordFullHubAttempt(minutesLate(20));
+
+    assertThat(tried.state()).isEqualTo(ACTIVE);
+    assertThat(tried.fullHubAttemptAt()).isEqualTo(minutesLate(20));
+  }
+
+  /** BR15: only the first refused attempt counts. */
+  @Test
+  void recordFullHubAttempt_secondAttempt_keepsTheFirst() {
+    Booking tried =
+        active().recordFullHubAttempt(minutesLate(20)).recordFullHubAttempt(minutesLate(30));
+
+    assertThat(tried.fullHubAttemptAt()).isEqualTo(minutesLate(20));
+  }
+
+  @Test
+  void recordFullHubAttempt_reservedBooking_isRefused() {
+    Booking booking = reserved();
+
+    assertRefused(() -> booking.recordFullHubAttempt(NOW), RESERVED, BookingAction.COMPLETE);
+  }
+
+  @Test
+  void complete_keepsTheFullHubAttempt() {
+    Booking completed =
+        active().recordFullHubAttempt(minutesLate(20)).complete(HUB_05, minutesLate(25));
+
+    assertThat(completed.fullHubAttemptAt()).isEqualTo(minutesLate(20));
+  }
+
+  @Test
+  void chargedUntil_withoutAFullHub_isTheEnd() {
+    Booking completed = active().complete(HUB_05, minutesLate(26));
+
+    assertThat(completed.chargedUntil()).contains(minutesLate(26));
+  }
+
+  /** BR15: ended within the window after the attempt (inclusive), charged until the attempt. */
+  @ParameterizedTest(name = "ended {0} s after the attempt: charged until the attempt")
+  @ValueSource(longs = {0, 600, 900})
+  void chargedUntil_endedWithinTheWindowAfterAFullHub_isTheAttempt(long secondsAfter) {
+    Booking completed =
+        active()
+            .recordFullHubAttempt(minutesLate(20))
+            .complete(HUB_05, minutesLate(20).plusSeconds(secondsAfter));
+
+    assertThat(completed.chargedUntil()).contains(minutesLate(20));
+  }
+
+  /** BR15: 15:00 attempt, 15:16 end: counted until 15:16. */
+  @ParameterizedTest(name = "ended {0} s after the attempt: charged until the end")
+  @ValueSource(longs = {901, 960})
+  void chargedUntil_endedAfterTheWindow_isTheEnd(long secondsAfter) {
+    Instant end = minutesLate(20).plusSeconds(secondsAfter);
+    Booking completed = active().recordFullHubAttempt(minutesLate(20)).complete(HUB_05, end);
+
+    assertThat(completed.chargedUntil()).contains(end);
+  }
+
+  @Test
+  void chargedUntil_bookingNotEnded_isEmpty() {
+    assertThat(active().chargedUntil()).isEmpty();
+  }
+
+  /** BR12 + BR13 on the booking: 26 min late is 4.00 EUR, taken from the 30.00 EUR deposit. */
+  @Test
+  void settlement_completedBooking_chargesTheOvertimeFromTheDeposit() {
+    Booking completed = active().complete(HUB_05, minutesLate(26));
+
+    assertThat(completed.settlement()).contains(Settlement.of(Money.of("4.00"), Money.of("30.00")));
+  }
+
+  @Test
+  void settlement_afterAFullHubWithinTheWindow_chargesUntilTheAttempt() {
+    Booking completed =
+        active().recordFullHubAttempt(minutesLate(20)).complete(HUB_05, minutesLate(35));
+
+    assertThat(completed.settlement().orElseThrow().charge()).isEqualTo(Money.of("2.00"));
+  }
+
+  @Test
+  void settlement_bookingNotEnded_isEmpty() {
+    assertThat(active().settlement()).isEmpty();
+  }
+
   // ------------------------------------------------------------- other transitions
 
   @Test
@@ -240,7 +337,8 @@ class BookingTest {
   void new_activeWithoutAStartTime_isRefused() {
     BookingTerms terms = terms(NOW, Duration.ofMinutes(60));
 
-    assertThatThrownBy(() -> new Booking(ID, terms, RULES, DEPOSIT, ACTIVE, null, null, null, null))
+    assertThatThrownBy(
+            () -> new Booking(ID, terms, RULES, DEPOSIT, ACTIVE, null, null, null, null, null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -249,7 +347,7 @@ class BookingTest {
     BookingTerms terms = terms(NOW, Duration.ofMinutes(60));
 
     assertThatThrownBy(
-            () -> new Booking(ID, terms, RULES, DEPOSIT, RESERVED, NOW, null, null, null))
+            () -> new Booking(ID, terms, RULES, DEPOSIT, RESERVED, NOW, null, null, null, null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -259,7 +357,7 @@ class BookingTest {
     Instant end = NOW.plus(Duration.ofMinutes(70));
 
     assertThatThrownBy(
-            () -> new Booking(ID, terms, RULES, DEPOSIT, COMPLETED, NOW, end, null, null))
+            () -> new Booking(ID, terms, RULES, DEPOSIT, COMPLETED, NOW, end, null, null, null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -268,7 +366,7 @@ class BookingTest {
     BookingTerms terms = terms(NOW, Duration.ofMinutes(60));
 
     assertThatThrownBy(
-            () -> new Booking(ID, terms, RULES, DEPOSIT, CANCELLED, null, null, null, null))
+            () -> new Booking(ID, terms, RULES, DEPOSIT, CANCELLED, null, null, null, null, null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

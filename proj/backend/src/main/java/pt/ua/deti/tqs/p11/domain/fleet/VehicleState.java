@@ -56,6 +56,7 @@ public enum VehicleState {
       case REPORT_FAULT -> to(MAINTENANCE, EnumSet.of(AVAILABLE, RESERVED));
       case RESERVE -> to(RESERVED, EnumSet.of(AVAILABLE));
       case RELEASE -> to(AVAILABLE, EnumSet.of(RESERVED));
+      case END_USE -> to(AVAILABLE, EnumSet.of(IN_USE));
     };
   }
 
