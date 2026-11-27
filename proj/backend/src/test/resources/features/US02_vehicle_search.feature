@@ -89,6 +89,7 @@ Feature: Search available vehicles by hub and vehicle type (US02)
     When the tourist searches hub "hub-03" to ride for 1440 minutes
     Then no vehicle is bookable
 
+  @BR1
   Scenario Outline: A duration outside one minute to one day is refused
     When the tourist searches hub "hub-03" to ride for <minutes> minutes
     Then the search is refused as invalid
