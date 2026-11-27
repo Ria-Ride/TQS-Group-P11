@@ -209,7 +209,7 @@ classDiagram
 | Account | Accounts and Access | A person using the platform. A guest is an account created with name and email only, with no institutional identity. Roles define what the person may do. A field technician is an OPERATOR account with `fieldTechnician` set |
 | Role | Accounts and Access | END_USER, OPERATOR, CLIENT_MANAGER, ADMIN |
 | Client | Client Rules and KPIs | The institution that contracts the service (the hotel group). Owns the hubs, sets the rules and issues the stay codes of its partner accommodations |
-| RulesOfUse | Client Rules and KPIs | Configuration the client edits: maximum booking duration, minimum battery to book and the battery a ride uses per started 30 minutes (one rate for each vehicle type), start window of a reservation, repositioning window after a refused return, and the overtime parameters (grace period, block length, rate per block) |
+| RulesOfUse | Client Rules and KPIs | Configuration the client manager edits (US14). It is kept as versions: a change makes the next version and never edits an old one, so a booking keeps the version it was created with (BR21). The first version is seeded. Values: longest booking (more than 0, at most 24 hours), minimum battery (0 to 100%), the battery a ride uses per started 30 minutes of each vehicle type, start window, repositioning window, overtime parameters, and the deposit of each vehicle type. Configuration the client edits: maximum booking duration, minimum battery to book and the battery a ride uses per started 30 minutes (one rate for each vehicle type), start window of a reservation, repositioning window after a refused return, and the overtime parameters (grace period, block length, rate per block) |
 | DepositRate | Client Rules and KPIs | Deposit amount for one vehicle type |
 | ServiceLevel | Client Rules and KPIs | The contracted SLA: maximum repair time for maintenance tickets and the availability target used by the KPIs |
 | Hub | Fleet | A place where vehicles are picked up and returned: a code, a name, a location and a capacity. It holds at most `capacity` vehicles (BR14). Operators register hubs and change the capacity (US08); client managers can change it too (US14) |
@@ -307,6 +307,7 @@ stateDiagram-v2
   direction LR
   [*] --> Open : fault reading, or operator opens manually
   Open --> Assigned : operator assigns a field technician
+  Assigned --> Assigned : operator assigns another field technician
   Assigned --> InProgress : technician starts the job
   InProgress --> Closed : technician records the work and closes
   Open --> Cancelled : false alarm or duplicate
@@ -314,6 +315,8 @@ stateDiagram-v2
   Closed --> [*]
   Cancelled --> [*]
 ```
+
+A ticket is **open** while it is Open, Assigned or InProgress. A vehicle has at most one open ticket per fault code (BR20): the simulator repeats the current fault in every reading, and only the first reading opens a ticket; a manual ticket for a fault already covered is refused, with the id of the open ticket. A different fault opens a ticket of its own. A Retired vehicle gets no ticket. The SLA deadline is the opening time plus the contracted repair time, 24 hours by default (BR19). Only an active OPERATOR with `fieldTechnician` set can be assigned, and a ticket can be reassigned until the job starts (BR20).
 
 Closing needs a non-empty record of the work done. Missing the SLA deadline does not change the state; it marks the ticket as breached for the KPIs and alerts. When a ticket is closed or cancelled, the vehicle leaves Maintenance only if no other ticket is open for it.
 

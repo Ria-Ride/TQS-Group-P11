@@ -3,6 +3,7 @@ package pt.ua.deti.tqs.p11.application.telemetry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +27,7 @@ import pt.ua.deti.tqs.p11.domain.fleet.GeoPosition;
 import pt.ua.deti.tqs.p11.domain.fleet.LockState;
 import pt.ua.deti.tqs.p11.domain.fleet.Vehicle;
 import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
+import pt.ua.deti.tqs.p11.domain.maintenance.FaultCode;
 
 /**
  * Applying a telemetry reading to a vehicle (US09, BR17). A reading is applied only if the battery
@@ -42,14 +44,16 @@ class TelemetryIngestionUseCaseTest {
   private static final FleetCode BIKE_CODE = FleetCode.of("bike-0009");
   private static final Instant T0 = Instant.parse("2026-11-10T10:00:00Z");
   private static final GeoPosition CANAL = new GeoPosition(40.6405, -8.6538);
+  private static final FaultCode BRAKE_WEAR = FaultCode.of("BRAKE_WEAR");
 
   @Mock private VehicleRepository vehicles;
+  @Mock private FaultReportListener faults;
 
   private TelemetryIngestionUseCase useCase;
 
   @BeforeEach
   void setUp() {
-    useCase = new TelemetryIngestionUseCase(vehicles, new DirectTransactionRunner());
+    useCase = new TelemetryIngestionUseCase(vehicles, new DirectTransactionRunner(), faults);
   }
 
   private static Vehicle bike() {
@@ -179,5 +183,52 @@ class TelemetryIngestionUseCaseTest {
   @Test
   void report_badBatteryAndUnknownVehicle_reportsTheBattery() {
     assertThat(useCase.report(reading(101, T0))).isEqualTo(ReadingOutcome.INVALID_BATTERY);
+  }
+
+  // ------------------------------------------------------------- faults (US10)
+
+  private static VehicleReading readingWithFault(double battery, Instant at) {
+    return new VehicleReading(BIKE_CODE, battery, LockState.LOCKED, CANAL, at, BRAKE_WEAR);
+  }
+
+  /** BR18: maintenance sees the vehicle as saved, with the reading already applied. */
+  @Test
+  void report_appliedReadingWithAFault_isPassedOnWithTheUpdatedVehicle() {
+    bikeIs(bike());
+
+    ReadingOutcome outcome = useCase.report(readingWithFault(78.0, T0));
+
+    assertThat(outcome).isEqualTo(ReadingOutcome.APPLIED);
+    ArgumentCaptor<Vehicle> reported = forClass(Vehicle.class);
+    verify(faults).faultReported(reported.capture(), eq(BRAKE_WEAR));
+    assertThat(reported.getValue()).isEqualTo(savedVehicle());
+  }
+
+  @Test
+  void report_readingWithoutAFault_reportsNoFault() {
+    bikeIs(bike());
+
+    useCase.report(reading(78.0, T0));
+
+    verify(faults, never()).faultReported(any(), any());
+  }
+
+  /** BR17: a discarded reading changes nothing, so its fault is not reported either. */
+  @Test
+  void report_staleReadingWithAFault_reportsNoFault() {
+    bikeIs(bike().withReading(BatteryLevel.of(80), LockState.LOCKED, CANAL, T0));
+
+    ReadingOutcome outcome = useCase.report(readingWithFault(78.0, T0));
+
+    assertThat(outcome).isEqualTo(ReadingOutcome.STALE);
+    verify(faults, never()).faultReported(any(), any());
+  }
+
+  @Test
+  void report_invalidBatteryWithAFault_reportsNoFault() {
+    ReadingOutcome outcome = useCase.report(readingWithFault(101, T0));
+
+    assertThat(outcome).isEqualTo(ReadingOutcome.INVALID_BATTERY);
+    verify(faults, never()).faultReported(any(), any());
   }
 }

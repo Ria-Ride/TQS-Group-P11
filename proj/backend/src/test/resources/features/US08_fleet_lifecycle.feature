@@ -7,9 +7,9 @@ Feature: Hubs, vehicles and vehicle lifecycle (US08)
   # Hubs and vehicles are identified by a code, as in the telemetry simulator (hub-03, bike-0009).
   # A vehicle given "in state" X is registered at hub "hub-03" (capacity 10) and brought to X.
   # In InUse, InTransit or Retired it then belongs to no hub.
-  # Bookings (US04, US05) and maintenance tickets (US10) do not exist yet, so the steps put a
-  # vehicle in Reserved, InUse or Maintenance directly in the database. Activation refused because
-  # of an open ticket is added with US10.
+  # Bookings (US04, US05) do not exist yet, so the steps put a vehicle in Reserved or InUse, and
+  # in Maintenance, directly in the database. Activation refused because of an open ticket is in
+  # US10_maintenance_tickets.feature.
   # The full state x action table of BR16 is covered by a parameterised unit test; the scenarios
   # below illustrate it, as US13 does for the access matrix.
 

@@ -15,6 +15,7 @@ import pt.ua.deti.tqs.p11.application.telemetry.VehicleReading;
 import pt.ua.deti.tqs.p11.domain.fleet.FleetCode;
 import pt.ua.deti.tqs.p11.domain.fleet.GeoPosition;
 import pt.ua.deti.tqs.p11.domain.fleet.LockState;
+import pt.ua.deti.tqs.p11.domain.maintenance.FaultCode;
 
 /**
  * Telemetry messages of the simulator contract 1.0.0, read from the examples of the contract
@@ -59,16 +60,21 @@ class TelemetryMessageParserTest {
 
     assertThat(reading.position()).isNotNull();
     assertThat(reading.lockState()).isEqualTo(LockState.UNLOCKED);
+    assertThat(reading.fault()).isEmpty();
   }
 
-  /** Only a hub is known: there is no position, and the core keeps the last known one. */
+  /**
+   * Only a hub is known: there is no position, and the core keeps the last known one. The fault is
+   * passed on, so the core can open a ticket (US10).
+   */
   @Test
-  void parse_hubOnlyWithAFault_givesAReadingWithoutPosition() throws IOException {
+  void parse_hubOnlyWithAFault_givesAReadingWithoutPositionAndWithTheFault() throws IOException {
     VehicleReading reading =
         PARSER.parse(topicOf("scooter-0007"), example("valid", "telemetry-hub-only-with-fault"));
 
     assertThat(reading.position()).isNull();
     assertThat(reading.vehicleCode()).isEqualTo(FleetCode.of("scooter-0007"));
+    assertThat(reading.fault()).contains(FaultCode.of("BRAKE_WEAR"));
   }
 
   /** The core decides what a battery of -1 or 101 means (BR17), not the parser. */

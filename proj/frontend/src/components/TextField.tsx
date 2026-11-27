@@ -1,7 +1,7 @@
 interface TextFieldProps {
   id: string;
   label: string;
-  type?: "text" | "email" | "password";
+  type?: "text" | "email" | "password" | "date";
   autoComplete?: string;
   /** Which keyboard phones show, e.g. "decimal" for coordinates. */
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];

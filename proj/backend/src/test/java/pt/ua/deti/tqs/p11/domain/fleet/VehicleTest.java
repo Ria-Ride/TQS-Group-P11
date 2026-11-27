@@ -98,6 +98,39 @@ class VehicleTest {
     assertThatThrownBy(retired::activate).isInstanceOf(ForbiddenTransitionException.class);
   }
 
+  // ------------------------------------------------------------- faults (US10)
+
+  @Test
+  void reportFault_availableVehicle_goesToMaintenanceAtTheSameHub() {
+    Vehicle vehicle = registeredAtHub03().activate().reportFault();
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.MAINTENANCE);
+    assertThat(vehicle.currentHub()).contains(HUB_03);
+  }
+
+  @Test
+  void reportFault_reservedVehicle_goesToMaintenanceAtTheSameHub() {
+    Vehicle reserved = new Vehicle(ID, CODE, VehicleType.E_BIKE, VehicleState.RESERVED, HUB_03);
+
+    Vehicle vehicle = reserved.reportFault();
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.MAINTENANCE);
+    assertThat(vehicle.currentHub()).contains(HUB_03);
+  }
+
+  /**
+   * BR18: an InUse ride is not interrupted, and a vehicle already out of service stays as it is;
+   * the fault is still recorded by its ticket.
+   */
+  @ParameterizedTest
+  @EnumSource(names = {"IN_USE", "DEACTIVATED", "IN_TRANSIT", "MAINTENANCE", "RETIRED"})
+  void reportFault_vehicleNotOffered_keepsItsState(VehicleState state) {
+    Vehicle vehicle =
+        new Vehicle(ID, CODE, VehicleType.E_BIKE, state, state.isAtHub() ? HUB_03 : null);
+
+    assertThat(vehicle.reportFault()).isEqualTo(vehicle);
+  }
+
   @ParameterizedTest
   @EnumSource(names = {"DEACTIVATED", "AVAILABLE", "RESERVED", "MAINTENANCE"})
   void new_stateAtAHubWithoutAHub_isRejected(VehicleState state) {

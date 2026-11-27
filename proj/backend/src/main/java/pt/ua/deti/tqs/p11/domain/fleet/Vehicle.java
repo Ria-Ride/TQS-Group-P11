@@ -189,6 +189,17 @@ public record Vehicle(
   }
 
   /**
+   * BR18: a fault sends an Available or Reserved vehicle to maintenance, at the same hub. In any
+   * other state the vehicle is kept as it is: an InUse ride is not interrupted, and a vehicle that
+   * is not offered stays out of service. The fault itself is recorded by its ticket.
+   */
+  public Vehicle reportFault() {
+    return state.allows(VehicleAction.REPORT_FAULT)
+        ? transition(VehicleAction.REPORT_FAULT, hubId)
+        : this;
+  }
+
+  /**
    * Applies the lifecycle table. The vehicle is at hubAfter if the new state is at a hub, and at no
    * hub otherwise.
    */

@@ -320,6 +320,12 @@ public class FleetSteps {
     assertConflictOn("hubId");
   }
 
+  /** BR16: a vehicle with an open maintenance ticket (US10) cannot be activated. */
+  @Then("the transition is refused because the vehicle has an open ticket")
+  public void theTransitionIsRefusedBecauseOfAnOpenTicket() {
+    assertConflictOn("action");
+  }
+
   @Then("vehicle {string} is {string}")
   public void vehicleIs(String code, String state) {
     assertThat(vehicle(code)).containsEntry("state", apiState(state));
