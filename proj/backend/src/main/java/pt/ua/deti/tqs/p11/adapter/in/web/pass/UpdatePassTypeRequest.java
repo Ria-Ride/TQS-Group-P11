@@ -16,7 +16,7 @@ import pt.ua.deti.tqs.p11.domain.fleet.VehicleType;
  * not here because it never changes.
  */
 record UpdatePassTypeRequest(
-    @Pattern(regexp = ".*\\S.*", message = "must not be blank") @Size(max = 100) String name,
+    @Pattern(regexp = "(?s)\\s*+\\S.*", message = "must not be blank") @Size(max = 100) String name,
     @Min(1) @Max(PassTypeFields.MAX_VALIDITY_DAYS) Integer validityDays,
     @Schema(description = "Price before any discount, with at most two decimals", example = "45.50")
         @Pattern(regexp = MoneyFields.AMOUNT, message = MoneyFields.MESSAGE)
