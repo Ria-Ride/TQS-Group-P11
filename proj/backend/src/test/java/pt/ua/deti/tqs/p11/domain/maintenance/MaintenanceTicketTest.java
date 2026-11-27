@@ -399,6 +399,14 @@ class MaintenanceTicketTest {
     assertThat(open.isBreachedAt(OPENED_AT.plus(Duration.ofMinutes(minutes)))).isEqualTo(breached);
   }
 
+  /** A cancelled ticket needs no repair, so it is never late, however long ago it was due. */
+  @Test
+  void isBreachedAt_cancelledTicket_isNeverBreached() {
+    MaintenanceTicket cancelled = inState(TicketState.CANCELLED, TIAGO);
+
+    assertThat(cancelled.isBreachedAt(OPENED_AT.plus(Duration.ofDays(10)))).isFalse();
+  }
+
   @Test
   void timeToRepair_closedTicket_isFromOpeningToClosing() {
     assertThat(closedAfter(Duration.ofMinutes(1441)).timeToRepair())

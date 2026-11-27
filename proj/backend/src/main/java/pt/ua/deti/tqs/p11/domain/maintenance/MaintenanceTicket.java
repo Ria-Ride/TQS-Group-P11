@@ -242,11 +242,12 @@ public record MaintenanceTicket(
    */
   public boolean isBreachedAt(Instant now) {
     Objects.requireNonNull(now, "now");
-    return switch (state) {
-      case CLOSED -> closedAt.isAfter(slaDeadline);
-      case CANCELLED -> false;
-      case OPEN, ASSIGNED, IN_PROGRESS -> now.isAfter(slaDeadline);
-    };
+    // Only a Closed ticket has a closing time (checked by the constructor).
+    if (closedAt != null) {
+      return closedAt.isAfter(slaDeadline);
+    }
+    // An open ticket is judged by now; a cancelled one is never late.
+    return state.isOpen() && now.isAfter(slaDeadline);
   }
 
   /** BR19: from opening to closing, for the KPIs; empty until the ticket is closed. */
