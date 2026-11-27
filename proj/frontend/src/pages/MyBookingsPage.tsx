@@ -2,14 +2,19 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
 import {
   cancelBooking,
+  endRide,
   listBookings,
+  nearbyHubsOf,
   startBooking,
   type Booking,
   type BookingState,
+  type NearbyHub,
 } from "../api/bookings";
 import { ApiError } from "../api/client";
+import { listHubs, type Hub } from "../api/fleet";
 import { clearSession, loadSession } from "../auth/session";
 import { Logo } from "../components/Logo";
+import { hubLabel } from "./fleetLabels";
 import { GENERIC_ERROR } from "./messages";
 
 type PageState = "loading" | "ready" | "error";
@@ -17,6 +22,12 @@ type PageState = "loading" | "ready" | "error";
 const NO_BOOKINGS = "You have no bookings yet.";
 const TOO_EARLY = "It is too early to start this ride. Come back at its planned start.";
 const NO_LONGER = "This booking can no longer be started or cancelled. Refresh to see its state.";
+const HUB_FULL =
+  "This hub is full. End at a nearby hub with room: if you do it soon, overtime is counted only " +
+  "until now.";
+const NOT_LOCKED = "The vehicle could not be locked. Park it inside the hub and try again.";
+const NO_ANSWER = "The vehicle did not answer. Try again in a moment.";
+const NOT_ACTIVE = "This ride has already ended. Refresh to see it.";
 
 /** How often the page looks at the clock, so the start action appears when its window opens. */
 const CLOCK_TICK_MS = 15_000;
@@ -49,10 +60,29 @@ function actionError(failure: unknown): string {
   return GENERIC_ERROR;
 }
 
+/** A refused end of a ride (US06), in words for tourists; the ride goes on in every case. */
+function endError(failure: unknown): string {
+  if (!(failure instanceof ApiError)) return GENERIC_ERROR;
+  if (failure.status === 504) return NO_ANSWER;
+  const fields = failure.fieldErrors;
+  if ("hubId" in fields && failure.status === 409) return HUB_FULL;
+  if ("vehicleId" in fields) return NOT_LOCKED;
+  if ("booking" in fields) return NOT_ACTIVE;
+  return GENERIC_ERROR;
+}
+
+function nearbyLabel(nearby: NearbyHub): string {
+  return `End at ${nearby.code} · ${nearby.name} (${nearby.freeSlots} free, ${Math.round(nearby.distanceMeters)} m)`;
+}
+
 /**
  * US05: the tourist's bookings. A Reserved one shows when it can be started (BR7) and can be
  * cancelled, which gives the whole deposit back (BR13). The start action is offered only inside the
  * window; the API stays the authority and its refusals are explained.
+ *
+ * US06: an Active ride is ended at a hub the tourist picks. A full hub is explained and its nearby
+ * hubs with room are offered as one-click ends (BR14, BR15). An ended ride shows its overtime
+ * charge, what the deposit paid and what was given back (BR12, BR13).
  */
 export function MyBookingsPage() {
   const navigate = useNavigate();
@@ -62,6 +92,9 @@ export function MyBookingsPage() {
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [hubs, setHubs] = useState<Hub[]>([]);
+  const [endHub, setEndHub] = useState<Record<string, string>>({});
+  const [nearby, setNearby] = useState<Record<string, NearbyHub[]>>({});
 
   const token = session?.accessToken ?? null;
 
@@ -92,6 +125,22 @@ export function MyBookingsPage() {
     };
   }, [token, logInAgain]);
 
+  // The hubs a ride can end at. Without them only the suggestions of a full hub are offered.
+  useEffect(() => {
+    if (token === null) return;
+    let active = true;
+    listHubs(token)
+      .then((loaded) => {
+        if (active) setHubs(loaded);
+      })
+      .catch(() => {
+        // the page still works; ending needs a hub, which the next load may bring
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
     return () => clearInterval(timer);
@@ -114,6 +163,26 @@ export function MyBookingsPage() {
         return;
       }
       setErrors((previous) => ({ ...previous, [booking.id]: actionError(failure) }));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function end(booking: Booking, hubId: string) {
+    if (token === null || hubId === "") return;
+    setBusy(booking.id);
+    setErrors((previous) => ({ ...previous, [booking.id]: "" }));
+    setNearby((previous) => ({ ...previous, [booking.id]: [] }));
+    try {
+      const changed = await endRide(booking.id, hubId, token);
+      setBookings((previous) => previous.map((b) => (b.id === changed.id ? changed : b)));
+    } catch (failure: unknown) {
+      if (failure instanceof ApiError && failure.status === 401) {
+        logInAgain();
+        return;
+      }
+      setErrors((previous) => ({ ...previous, [booking.id]: endError(failure) }));
+      setNearby((previous) => ({ ...previous, [booking.id]: nearbyHubsOf(failure) }));
     } finally {
       setBusy(null);
     }
@@ -168,10 +237,72 @@ export function MyBookingsPage() {
                   <p>Your deposit of {deposit} was given back.</p>
                 )}
 
+                {booking.state === "COMPLETED" && (
+                  <dl className="pass-details">
+                    <dt>Overtime charge</dt>
+                    <dd className="overtime">{`${booking.overtimeCharge} ${booking.currency}`}</dd>
+                    <dt>Taken from the deposit</dt>
+                    <dd className="captured">{`${booking.depositCaptured} ${booking.currency}`}</dd>
+                    <dt>Given back</dt>
+                    <dd className="released">{`${booking.depositReleased} ${booking.currency}`}</dd>
+                  </dl>
+                )}
+
                 {error && (
                   <p role="alert" className="form-error">
                     {error}
                   </p>
+                )}
+
+                {booking.state === "ACTIVE" && (
+                  <form
+                    className="form"
+                    aria-label="End the ride"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void end(booking, endHub[booking.id] ?? hubs[0]?.id ?? "");
+                    }}
+                  >
+                    <div className="field">
+                      <label htmlFor={`end-hub-${booking.id}`}>End at hub</label>
+                      <select
+                        id={`end-hub-${booking.id}`}
+                        value={endHub[booking.id] ?? hubs[0]?.id ?? ""}
+                        onChange={(e) =>
+                          setEndHub((previous) => ({ ...previous, [booking.id]: e.target.value }))
+                        }
+                      >
+                        {hubs.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {hubLabel(option)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      className="button"
+                      disabled={busy === booking.id || hubs.length === 0}
+                    >
+                      End ride
+                    </button>
+                    {(nearby[booking.id] ?? []).length > 0 && (
+                      <ul className="choice-list" aria-label="Nearby hubs with room">
+                        {(nearby[booking.id] ?? []).map((suggestion) => (
+                          <li key={suggestion.id}>
+                            <button
+                              type="button"
+                              className="button button-secondary"
+                              disabled={busy === booking.id}
+                              onClick={() => void end(booking, suggestion.id)}
+                            >
+                              {nearbyLabel(suggestion)}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </form>
                 )}
 
                 {booking.state === "RESERVED" && (
