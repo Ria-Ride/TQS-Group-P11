@@ -6,6 +6,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.ACTIVATE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.CONFIRM_ARRIVAL;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.DEACTIVATE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.REPORT_FAULT;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RETIRE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_MOVE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_USE;
@@ -14,6 +15,7 @@ import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.DEACTIVATED;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_TRANSIT;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.IN_USE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.MAINTENANCE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.RESERVED;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.RETIRED;
 
 import java.util.Arrays;
@@ -41,7 +43,10 @@ class VehicleStateTest {
           arguments(DEACTIVATED, RETIRE, RETIRED),
           arguments(AVAILABLE, RETIRE, RETIRED),
           arguments(MAINTENANCE, RETIRE, RETIRED),
-          arguments(AVAILABLE, START_USE, IN_USE));
+          arguments(AVAILABLE, START_USE, IN_USE),
+          // BR18: a fault sends an Available or Reserved vehicle to maintenance (US10).
+          arguments(AVAILABLE, REPORT_FAULT, MAINTENANCE),
+          arguments(RESERVED, REPORT_FAULT, MAINTENANCE));
 
   static Stream<Arguments> allowedTransitions() {
     return ALLOWED.stream();
@@ -77,6 +82,18 @@ class VehicleStateTest {
               assertThat(e.from()).isEqualTo(from);
               assertThat(e.action()).isEqualTo(action);
             });
+  }
+
+  @ParameterizedTest(name = "{0} allows {1}")
+  @MethodSource("allowedTransitions")
+  void allows_allowedAction_isTrue(VehicleState from, VehicleAction action, VehicleState to) {
+    assertThat(from.allows(action)).isTrue();
+  }
+
+  @ParameterizedTest(name = "{0} does not allow {1}")
+  @MethodSource("forbiddenTransitions")
+  void allows_forbiddenAction_isFalse(VehicleState from, VehicleAction action) {
+    assertThat(from.allows(action)).isFalse();
   }
 
   /** BR14: InUse, InTransit and Retired vehicles belong to no hub and take no slot. */

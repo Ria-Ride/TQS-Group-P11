@@ -49,6 +49,17 @@ class PassTypeJpaEntity {
   /** For JPA only. */
   protected PassTypeJpaEntity() {}
 
+  static PassTypeJpaEntity from(PassType passType) {
+    PassTypeJpaEntity entity = new PassTypeJpaEntity();
+    entity.id = passType.id();
+    entity.code = passType.code();
+    entity.name = passType.name();
+    entity.validityDays = passType.validityDays();
+    entity.basePrice = passType.basePrice().amount();
+    entity.vehicleTypes = new HashSet<>(passType.vehicleTypes());
+    return entity;
+  }
+
   PassType toDomain() {
     return new PassType(
         id, code, name, validityDays, new Money(basePrice), Set.copyOf(vehicleTypes));

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,7 +56,7 @@ class VehicleSearchUseCaseTest {
 
   @BeforeEach
   void setUp() {
-    useCase = new VehicleSearchUseCase(hubs, vehicles, rule(20));
+    useCase = new VehicleSearchUseCase(hubs, vehicles, () -> rule(20));
   }
 
   private static Vehicle vehicle(
@@ -107,7 +108,7 @@ class VehicleSearchUseCaseTest {
   /** The configured minimum is used, not a fixed 20%: 19% passes a minimum of 15%. */
   @Test
   void search_usesTheConfiguredMinimum() {
-    VehicleSearchUseCase lenient = new VehicleSearchUseCase(hubs, vehicles, rule(15));
+    VehicleSearchUseCase lenient = new VehicleSearchUseCase(hubs, vehicles, () -> rule(15));
     hubHolds(vehicle("bike-0002", VehicleType.E_BIKE, VehicleState.AVAILABLE, 19));
 
     assertThat(lenient.search(HUB_03_ID))
@@ -134,6 +135,24 @@ class VehicleSearchUseCaseTest {
     hubHolds(vehicle("bike-0001", VehicleType.E_BIKE, VehicleState.AVAILABLE, 80));
 
     assertThat(useCase.search(HUB_03_ID, VehicleType.E_SCOOTER)).isEmpty();
+  }
+
+  /** US14: the rule is read at every search, so a change by the client manager is seen at once. */
+  @Test
+  void search_usesTheRuleInForceAtEachSearch() {
+    AtomicReference<BatteryRule> inForce = new AtomicReference<>(rule(20));
+    VehicleSearchUseCase changing = new VehicleSearchUseCase(hubs, vehicles, inForce::get);
+    hubHolds(vehicle("bike-0001", VehicleType.E_BIKE, VehicleState.AVAILABLE, 40));
+
+    assertThat(changing.search(HUB_03_ID))
+        .extracting(SearchedVehicle::bookability)
+        .containsExactly(Bookability.BOOKABLE);
+
+    inForce.set(rule(50));
+
+    assertThat(changing.search(HUB_03_ID))
+        .extracting(SearchedVehicle::bookability)
+        .containsExactly(Bookability.LOW_BATTERY);
   }
 
   // ------------------------------------------------------------- duration of the ride

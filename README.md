@@ -103,6 +103,19 @@ simulator contract, over the same MQTT connection as telemetry. It does not wait
 Each command carries an `expiresAt`, `app.telemetry.command-ttl` after it is sent (default `PT30S`),
 so a command delayed in the broker is rejected by the vehicle instead of applied late. With
 telemetry off, commands are only logged and rides still start.
+### Maintenance tickets
+
+A reading with a fault code opens a maintenance ticket (US10), due 24 hours later, and an Available
+or Reserved vehicle goes to Maintenance; the fault repeated by later readings opens no other ticket.
+Operators see the open tickets, open one by hand and assign field technicians at
+`/operator/tickets` ("Maintenance tickets" on the home page). A vehicle with an open ticket cannot
+be activated. To watch it happen, run the simulator scenario with scripted faults by adding
+`SIMULATOR_SCENARIO_FILE=classpath:scenarios/ria-ride-faults.yml` to `.env`: about 30, 60 and 90
+seconds after the simulator starts, `bike-0001`, `scooter-0001` and `bike-0002` report a fault.
+
+| Setting (environment variable) | Default | Meaning |
+| --- | --- | --- |
+| `APP_MAINTENANCE_SLA_HOURS` | `24` | Contracted repair time (BR19): a ticket is due its opening time plus this; must be positive |
 
 To work on the fleet telemetry simulator, clone its repository into `proj/simulator` (that folder
 is git-ignored here, so the two repositories stay separate):

@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.application.pass;
 
+import java.util.List;
 import java.util.Optional;
 import pt.ua.deti.tqs.p11.domain.pass.Stay;
 
@@ -18,4 +19,12 @@ public interface StayRepository {
 
   /** Stores the account the code is linked to; the rest of a stay does not change here. */
   void save(Stay stay);
+
+  boolean existsByCode(String code);
+
+  /** Stores a new stay (the code is stored upper-case). */
+  void add(Stay stay);
+
+  /** Every stay, newest check-in first. */
+  List<Stay> findAll();
 }

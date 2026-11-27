@@ -20,15 +20,25 @@ import pt.ua.deti.tqs.p11.application.fleet.HubNotFoundException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleHasOpenTicketException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleNotFoundException;
+import pt.ua.deti.tqs.p11.application.maintenance.FaultAlreadyCoveredException;
+import pt.ua.deti.tqs.p11.application.maintenance.TicketNotFoundException;
+import pt.ua.deti.tqs.p11.application.maintenance.VehicleRetiredException;
+import pt.ua.deti.tqs.p11.application.pass.AccommodationNameAlreadyInUseException;
+import pt.ua.deti.tqs.p11.application.pass.PassTypeCodeAlreadyInUseException;
+import pt.ua.deti.tqs.p11.application.pass.PassTypeNotFoundException;
 import pt.ua.deti.tqs.p11.application.pass.PaymentDeclinedException;
 import pt.ua.deti.tqs.p11.application.pass.PaymentTimedOutException;
+import pt.ua.deti.tqs.p11.application.pass.UnknownAccommodationException;
 import pt.ua.deti.tqs.p11.application.pass.UnknownPassTypeException;
 import pt.ua.deti.tqs.p11.application.pass.UnknownStayCodeException;
+import pt.ua.deti.tqs.p11.application.rules.RulesVersionConflictException;
 import pt.ua.deti.tqs.p11.application.user.UserNotFoundException;
 import pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException;
 import pt.ua.deti.tqs.p11.domain.fleet.CapacityBelowVehiclesHeldException;
 import pt.ua.deti.tqs.p11.domain.fleet.ForbiddenTransitionException;
 import pt.ua.deti.tqs.p11.domain.fleet.HubFullException;
+import pt.ua.deti.tqs.p11.domain.maintenance.ForbiddenTicketTransitionException;
+import pt.ua.deti.tqs.p11.domain.maintenance.NotAFieldTechnicianException;
 import pt.ua.deti.tqs.p11.domain.pass.StayCodeLinkedToAnotherAccountException;
 import pt.ua.deti.tqs.p11.domain.pass.StayCodeNotValidTodayException;
 import pt.ua.deti.tqs.p11.domain.user.FieldTechnicianRequiresOperatorException;
@@ -66,6 +76,31 @@ class ApiExceptionHandler {
     return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("email", "is already in use"));
   }
 
+  // US14: the request is valid but conflicts with what exists (409), on its field.
+  @ExceptionHandler(PassTypeCodeAlreadyInUseException.class)
+  ProblemDetail passTypeCodeInUse(PassTypeCodeAlreadyInUseException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("code", "is already in use"));
+  }
+
+  @ExceptionHandler(AccommodationNameAlreadyInUseException.class)
+  ProblemDetail accommodationNameInUse(AccommodationNameAlreadyInUseException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("name", "is already in use"));
+  }
+
+  /** BR21: two managers saved the rules at the same moment; the second must read them again. */
+  @ExceptionHandler(RulesVersionConflictException.class)
+  ProblemDetail rulesVersionConflict(RulesVersionConflictException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of());
+  }
+
+  @ExceptionHandler(UnknownAccommodationException.class)
+  ProblemDetail unknownAccommodation(UnknownAccommodationException e) {
+    return problem(
+        HttpStatus.BAD_REQUEST,
+        INVALID_FIELDS,
+        Map.of("accommodationId", "is not a partner hotel"));
+  }
+
   private static ProblemDetail problem(
       HttpStatus status, String detail, Map<String, String> errors) {
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
@@ -81,7 +116,9 @@ class ApiExceptionHandler {
   @ExceptionHandler({
     UserNotFoundException.class,
     HubNotFoundException.class,
-    VehicleNotFoundException.class
+    VehicleNotFoundException.class,
+    TicketNotFoundException.class,
+    PassTypeNotFoundException.class
   })
   ProblemDetail notFound(RuntimeException e) {
     return problem(HttpStatus.NOT_FOUND, e.getMessage(), Map.of());
@@ -237,5 +274,39 @@ class ApiExceptionHandler {
         HttpStatus.GATEWAY_TIMEOUT,
         "The deposit got no answer in time",
         Map.of(DEPOSIT, "got no answer in time; try again"));
+  }
+  
+  // US10: maintenance tickets.
+
+  /** BR20: the fault is covered; ticketId is the open ticket, so the operator can go to it. */
+  @ExceptionHandler(FaultAlreadyCoveredException.class)
+  ProblemDetail faultAlreadyCovered(FaultAlreadyCoveredException e) {
+    ProblemDetail problem =
+        problem(
+            HttpStatus.CONFLICT,
+            e.getMessage(),
+            Map.of("faultCode", "is already covered by an open ticket"));
+    e.existingTicketId().ifPresent(id -> problem.setProperty("ticketId", id));
+    return problem;
+  }
+
+  @ExceptionHandler(VehicleRetiredException.class)
+  ProblemDetail vehicleRetired(VehicleRetiredException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("vehicleId", "is retired"));
+  }
+
+  /** BR20. Whether the account exists is not said. */
+  @ExceptionHandler(NotAFieldTechnicianException.class)
+  ProblemDetail notAFieldTechnician(NotAFieldTechnicianException e) {
+    return problem(
+        HttpStatus.BAD_REQUEST,
+        INVALID_FIELDS,
+        Map.of("technicianId", "is not an active field technician"));
+  }
+
+  /** The ticket's state no longer allows the change (e.g. the work has started). */
+  @ExceptionHandler(ForbiddenTicketTransitionException.class)
+  ProblemDetail ticketTransitionRefused(ForbiddenTicketTransitionException e) {
+    return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("state", e.getMessage()));
   }
 }
