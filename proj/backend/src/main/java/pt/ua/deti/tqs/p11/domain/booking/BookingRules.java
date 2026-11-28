@@ -9,12 +9,14 @@ import pt.ua.deti.tqs.p11.domain.rules.RulesOfUse;
 /**
  * BR21: the rules of use a booking keeps from the moment it is created, so a later change by the
  * client applies only to new bookings. The deposit is the one of the vehicle's type (BR11); the
- * start window bounds the start of a reservation (BR7); grace, block and price per block give the
- * overtime charge (BR12).
+ * start window bounds the start of a reservation (BR7); the repositioning window is how long after
+ * a refused end at a full hub the overtime stays counted until that refusal (BR15); grace, block
+ * and price per block give the overtime charge (BR12).
  */
 public record BookingRules(
     Money deposit,
     Duration startWindow,
+    Duration repositioningWindow,
     Duration overtimeGrace,
     Duration overtimeBlock,
     Money overtimePricePerBlock) {
@@ -22,11 +24,16 @@ public record BookingRules(
   public BookingRules {
     Objects.requireNonNull(deposit, "deposit");
     Objects.requireNonNull(startWindow, "startWindow");
+    Objects.requireNonNull(repositioningWindow, "repositioningWindow");
     Objects.requireNonNull(overtimeGrace, "overtimeGrace");
     Objects.requireNonNull(overtimeBlock, "overtimeBlock");
     Objects.requireNonNull(overtimePricePerBlock, "overtimePricePerBlock");
     if (startWindow.isNegative()) {
       throw new IllegalArgumentException("The start window cannot be negative: " + startWindow);
+    }
+    if (repositioningWindow.isNegative()) {
+      throw new IllegalArgumentException(
+          "The repositioning window cannot be negative: " + repositioningWindow);
     }
     if (overtimeGrace.isNegative()) {
       throw new IllegalArgumentException("The overtime grace cannot be negative: " + overtimeGrace);
@@ -41,6 +48,7 @@ public record BookingRules(
     return new BookingRules(
         inForce.deposit(type),
         inForce.startWindow(),
+        inForce.repositioningWindow(),
         inForce.overtimeGrace(),
         inForce.overtimeBlock(),
         inForce.overtimeRatePerBlock());

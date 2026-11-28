@@ -13,8 +13,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pt.ua.deti.tqs.p11.application.auth.EmailAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.auth.InvalidCredentialsException;
+import pt.ua.deti.tqs.p11.application.booking.BookingNotFoundException;
+import pt.ua.deti.tqs.p11.application.booking.BookingNotOwnedException;
 import pt.ua.deti.tqs.p11.application.booking.DepositDeclinedException;
 import pt.ua.deti.tqs.p11.application.booking.DepositTimedOutException;
+import pt.ua.deti.tqs.p11.application.booking.EndAtFullHubException;
+import pt.ua.deti.tqs.p11.application.booking.VehicleLockTimedOutException;
+import pt.ua.deti.tqs.p11.application.booking.VehicleNotLockedException;
 import pt.ua.deti.tqs.p11.application.fleet.HubCodeAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.fleet.HubNotFoundException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
@@ -34,6 +39,7 @@ import pt.ua.deti.tqs.p11.application.pass.UnknownStayCodeException;
 import pt.ua.deti.tqs.p11.application.rules.RulesVersionConflictException;
 import pt.ua.deti.tqs.p11.application.user.UserNotFoundException;
 import pt.ua.deti.tqs.p11.domain.booking.BookingRefusedException;
+import pt.ua.deti.tqs.p11.domain.booking.BookingTransitionNotAllowedException;
 import pt.ua.deti.tqs.p11.domain.fleet.CapacityBelowVehiclesHeldException;
 import pt.ua.deti.tqs.p11.domain.fleet.ForbiddenTransitionException;
 import pt.ua.deti.tqs.p11.domain.fleet.HubFullException;
@@ -255,6 +261,15 @@ class ApiExceptionHandler {
           case OVERLAPPING_BOOKING ->
               new Refusal(
                   HttpStatus.CONFLICT, "booking", "you already have a booking in that period");
+          // US05: a reservation starts later; BR7 bounds when it can be started.
+          case START_NOT_IN_THE_FUTURE ->
+              new Refusal(HttpStatus.BAD_REQUEST, "plannedStart", "must be in the future");
+          case TOO_EARLY_TO_START ->
+              new Refusal(
+                  HttpStatus.CONFLICT, "booking", "cannot be started before its planned start");
+          case START_WINDOW_PASSED ->
+              new Refusal(
+                  HttpStatus.CONFLICT, "booking", "cannot be started after its start window");
         };
     String detail =
         refusal.status() == HttpStatus.BAD_REQUEST ? INVALID_FIELDS : "The booking is refused";
@@ -266,6 +281,72 @@ class ApiExceptionHandler {
   ProblemDetail depositDeclined(DepositDeclinedException e) {
     return problem(
         HttpStatus.PAYMENT_REQUIRED, "The deposit was declined", Map.of(DEPOSIT, "was declined"));
+  }
+
+  // US05: acting on a booking that exists.
+
+  @ExceptionHandler(BookingNotFoundException.class)
+  ProblemDetail bookingNotFound(BookingNotFoundException e) {
+    return problem(HttpStatus.NOT_FOUND, e.getMessage(), Map.of());
+  }
+
+  /** BR23: told as any other refused access, so the client learns nothing about the booking. */
+  @ExceptionHandler(BookingNotOwnedException.class)
+  ProblemDetail bookingNotOwned(BookingNotOwnedException e) {
+    return problem(
+        HttpStatus.FORBIDDEN, "You do not have permission to access this resource", Map.of());
+  }
+
+  /**
+   * The booking is not in the state the action needs: start and cancel need it Reserved, ending it
+   * needs it Active. A switch with no default, so a new action does not compile until it is told.
+   */
+  @ExceptionHandler(BookingTransitionNotAllowedException.class)
+  ProblemDetail bookingTransitionNotAllowed(BookingTransitionNotAllowedException e) {
+    String message =
+        switch (e.action()) {
+          case START, CANCEL, EXPIRE -> "is not Reserved";
+          case COMPLETE -> "is not Active";
+        };
+    return problem(HttpStatus.CONFLICT, "The booking is refused", Map.of("booking", message));
+  }
+
+  // US06: ending a ride. In every case below the ride goes on and nothing is charged.
+
+  /** BR14, BR15: a full hub, with the nearest hubs that have room, nearest first. */
+  @ExceptionHandler(EndAtFullHubException.class)
+  ProblemDetail endAtFullHub(EndAtFullHubException e) {
+    ProblemDetail problem =
+        problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("hubId", "is full"));
+    problem.setProperty(
+        "nearbyHubs",
+        e.nearby().stream()
+            .map(nearby ->
+                Map.of(
+                    "id", nearby.hub().id(),
+                    "code", nearby.hub().code().value(),
+                    "name", nearby.hub().name(),
+                    "freeSlots", nearby.freeSlots(),
+                    "distanceMeters", Math.round(nearby.distanceMeters())))
+            .toList());
+    return problem;
+  }
+
+  /** The contract's reason (e.g. NOT_AT_HUB) is for the logs, not the tourist. */
+  @ExceptionHandler(VehicleNotLockedException.class)
+  ProblemDetail vehicleNotLocked(VehicleNotLockedException e) {
+    return problem(
+        HttpStatus.CONFLICT,
+        "The vehicle could not be locked",
+        Map.of("vehicleId", "could not be locked; check that it is parked in the hub"));
+  }
+
+  @ExceptionHandler(VehicleLockTimedOutException.class)
+  ProblemDetail vehicleLockTimedOut(VehicleLockTimedOutException e) {
+    return problem(
+        HttpStatus.GATEWAY_TIMEOUT,
+        e.getMessage(),
+        Map.of("vehicleId", "did not answer in time; try again"));
   }
 
   /** BR11: no answer in time, so no booking; the deposit was released. Trying again is safe. */

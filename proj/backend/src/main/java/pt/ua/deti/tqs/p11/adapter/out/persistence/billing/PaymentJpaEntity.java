@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import pt.ua.deti.tqs.p11.domain.billing.Money;
 import pt.ua.deti.tqs.p11.domain.billing.Payment;
 import pt.ua.deti.tqs.p11.domain.billing.PaymentKind;
 import pt.ua.deti.tqs.p11.domain.billing.PaymentState;
@@ -49,6 +50,9 @@ class PaymentJpaEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "captured_amount", precision = 10, scale = 2)
+  private BigDecimal capturedAmount;
+
   /** For JPA only. */
   protected PaymentJpaEntity() {}
 
@@ -64,6 +68,23 @@ class PaymentJpaEntity {
     entity.createdAt = payment.at();
     entity.kind = payment.kind();
     entity.bookingId = payment.bookingId().orElse(null);
+    entity.capturedAmount = payment.capturedAmount().map(Money::amount).orElse(null);
     return entity;
+  }
+
+  /** US05: read back through the domain constructor, so a row that breaks a rule is never used. */
+  Payment toDomain() {
+    return new Payment(
+        id,
+        accountId,
+        kind,
+        new Money(amount),
+        state,
+        gatewayReference,
+        failureReason,
+        passId,
+        bookingId,
+        createdAt,
+        capturedAmount == null ? null : new Money(capturedAmount));
   }
 }

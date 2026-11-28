@@ -50,6 +50,9 @@ class BookingJpaEntity {
   @Column(name = "start_window_seconds", nullable = false)
   private long startWindowSeconds;
 
+  @Column(name = "repositioning_window_seconds", nullable = false)
+  private long repositioningWindowSeconds;
+
   @Column(name = "overtime_grace_seconds", nullable = false)
   private long overtimeGraceSeconds;
 
@@ -75,6 +78,9 @@ class BookingJpaEntity {
   @Column(name = "cancel_reason", length = 100)
   private String cancelReason;
 
+  @Column(name = "full_hub_attempt_at")
+  private Instant fullHubAttemptAt;
+
   /** For JPA only. */
   protected BookingJpaEntity() {}
 
@@ -92,6 +98,7 @@ class BookingJpaEntity {
     entity.depositReference = booking.depositReference();
     entity.depositAmount = rules.deposit().amount();
     entity.startWindowSeconds = rules.startWindow().toSeconds();
+    entity.repositioningWindowSeconds = rules.repositioningWindow().toSeconds();
     entity.overtimeGraceSeconds = rules.overtimeGrace().toSeconds();
     entity.overtimeBlockSeconds = rules.overtimeBlock().toSeconds();
     entity.overtimePricePerBlock = rules.overtimePricePerBlock().amount();
@@ -100,6 +107,7 @@ class BookingJpaEntity {
     entity.endedAt = booking.endedAt();
     entity.endHubId = booking.endHubId();
     entity.cancelReason = booking.cancelReason();
+    entity.fullHubAttemptAt = booking.fullHubAttemptAt();
     return entity;
   }
 
@@ -111,10 +119,20 @@ class BookingJpaEntity {
         new BookingRules(
             new Money(depositAmount),
             Duration.ofSeconds(startWindowSeconds),
+            Duration.ofSeconds(repositioningWindowSeconds),
             Duration.ofSeconds(overtimeGraceSeconds),
             Duration.ofSeconds(overtimeBlockSeconds),
             new Money(overtimePricePerBlock));
     return new Booking(
-        id, terms, rules, depositReference, state, startedAt, endedAt, endHubId, cancelReason);
+        id,
+        terms,
+        rules,
+        depositReference,
+        state,
+        startedAt,
+        endedAt,
+        endHubId,
+        cancelReason,
+        fullHubAttemptAt);
   }
 }

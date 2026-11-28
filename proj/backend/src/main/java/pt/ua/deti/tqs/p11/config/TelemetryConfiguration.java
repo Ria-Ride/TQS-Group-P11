@@ -45,12 +45,17 @@ class TelemetryConfiguration {
     if (connection == null) {
       return new LoggingVehicleCommands();
     }
-    return new MqttVehicleCommandPublisher(
-        connection.client(),
-        properties.fleetId(),
-        properties.commandTtl(),
-        clock,
-        UUID::randomUUID);
+    MqttVehicleCommandPublisher publisher =
+        new MqttVehicleCommandPublisher(
+            connection.client(),
+            properties.fleetId(),
+            properties.commandTtl(),
+            properties.commandResponseTimeout(),
+            clock,
+            UUID::randomUUID);
+    // US06: the answers to lock commands are listened to on every connection.
+    connection.onEveryConnection(publisher::listenForResponses);
+    return publisher;
   }
 
   @Configuration

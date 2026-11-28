@@ -382,4 +382,201 @@ class BookingApiIT {
                 ana.id()))
         .isEqualTo(1);
   }
+
+  // ------------------------------------------------------------- US05: reservations
+
+  private ResponseEntity<Map<String, Object>> reserveBike(Registered who, int from, int to) {
+    Instant now = Instant.now();
+    Map<String, Object> body = new HashMap<>();
+    body.put("vehicleId", bike);
+    body.put("plannedStart", now.plus(Duration.ofMinutes(from)).toString());
+    body.put("plannedEnd", now.plus(Duration.ofMinutes(to)).toString());
+    body.put("paymentToken", "tok_approve");
+    return start(who.token(), body);
+  }
+
+  private ResponseEntity<Map<String, Object>> act(Registered who, Object bookingId, String action) {
+    return http.post()
+        .uri("/bookings/{id}/{action}", bookingId, action)
+        .header("Authorization", "Bearer " + who.token())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Map.of())
+        .retrieve()
+        .toEntity(ApiClient.JSON_OBJECT);
+  }
+
+  private ResponseEntity<Map<String, Object>> read(Registered who, Object bookingId) {
+    return http.get()
+        .uri("/bookings/{id}", bookingId)
+        .header("Authorization", "Bearer " + who.token())
+        .retrieve()
+        .toEntity(ApiClient.JSON_OBJECT);
+  }
+
+  private Registered bruno() {
+    return ApiClient.registerGuest(
+        http, "Bruno Tester", "bruno.bookingapi@example.com", "Passw0rd!");
+  }
+
+  @Test
+  void reserve_validRequest_is201WithTheReservedBookingItsWindowAndItsLocation() {
+    ResponseEntity<Map<String, Object>> response = reserveBike(ana, 60, 120);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    Map<String, Object> body = response.getBody();
+    assertThat(body)
+        .containsEntry("state", "RESERVED")
+        .containsEntry("startedAt", null)
+        .containsEntry("deposit", "30.00");
+    Instant plannedStart = Instant.parse((String) body.get("plannedStart"));
+    assertThat(Instant.parse((String) body.get("startWindowEndsAt")))
+        .isEqualTo(plannedStart.plus(Duration.ofMinutes(15)));
+    assertThat(response.getHeaders().getLocation()).hasPath("/bookings/" + body.get("id"));
+  }
+
+  @Test
+  void reserve_startInThePast_is400OnPlannedStart() {
+    assertRefusedOn(reserveBike(ana, -1, 60), HttpStatus.BAD_REQUEST, "plannedStart");
+  }
+
+  @Test
+  void start_tooEarly_is409OnBooking() {
+    Object id = reserveBike(ana, 60, 120).getBody().get("id");
+
+    assertRefusedOn(act(ana, id, "start"), HttpStatus.CONFLICT, "booking");
+  }
+
+  @Test
+  void cancel_ownReservation_is200WithTheCancelledBooking() {
+    Object id = reserveBike(ana, 60, 120).getBody().get("id");
+
+    ResponseEntity<Map<String, Object>> response = act(ana, id, "cancel");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody())
+        .containsEntry("state", "CANCELLED")
+        .containsEntry("cancelReason", "cancelled by the tourist");
+  }
+
+  @Test
+  void cancel_activeBooking_is409OnBooking() {
+    Object id = startBike(60).getBody().get("id");
+
+    assertRefusedOn(act(ana, id, "cancel"), HttpStatus.CONFLICT, "booking");
+  }
+
+  /** BR23: another tourist's booking can be neither read, started nor cancelled. */
+  @Test
+  void anotherTouristsBooking_is403ForEveryAction() {
+    Object id = reserveBike(ana, 60, 120).getBody().get("id");
+    Registered bruno = bruno();
+
+    assertThat(read(bruno, id).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(act(bruno, id, "start").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(act(bruno, id, "cancel").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(read(ana, id).getBody()).containsEntry("state", "RESERVED");
+  }
+
+  @Test
+  void unknownBooking_is404() {
+    assertThat(act(ana, UUID.randomUUID(), "cancel").getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(read(ana, UUID.randomUUID()).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void list_returnsOnlyTheCallersBookings() {
+    Object id = reserveBike(ana, 60, 120).getBody().get("id");
+    Registered bruno = bruno();
+
+    ResponseEntity<List<Map<String, Object>>> mine =
+        http.get()
+            .uri("/bookings")
+            .header("Authorization", "Bearer " + ana.token())
+            .retrieve()
+            .toEntity(FleetApi.JSON_LIST);
+    ResponseEntity<List<Map<String, Object>>> theirs =
+        http.get()
+            .uri("/bookings")
+            .header("Authorization", "Bearer " + bruno.token())
+            .retrieve()
+            .toEntity(FleetApi.JSON_LIST);
+
+    assertThat(mine.getBody()).extracting(booking -> booking.get("id")).containsExactly(id);
+    assertThat(theirs.getBody()).isEmpty();
+  }
+
+  // ------------------------------------------------------------- US06: the end of a ride
+
+  private ResponseEntity<Map<String, Object>> end(Registered who, Object bookingId, Object hubId) {
+    Map<String, Object> body = new HashMap<>();
+    body.put("hubId", hubId);
+    return http.post()
+        .uri("/bookings/{id}/end", bookingId)
+        .header("Authorization", "Bearer " + who.token())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(body)
+        .retrieve()
+        .toEntity(ApiClient.JSON_OBJECT);
+  }
+
+  /** Telemetry is off here: the lock is taken as done (LoggingVehicleCommands). */
+  @Test
+  void end_activeRideAtAHubWithRoom_is200WithTheSettlement() {
+    Object id = startBike(60).getBody().get("id");
+
+    ResponseEntity<Map<String, Object>> response = end(ana, id, hub);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody())
+        .containsEntry("state", "COMPLETED")
+        .containsEntry("endHubId", hub.toString())
+        .containsEntry("overtimeCharge", "0.00")
+        .containsEntry("depositCaptured", "0.00")
+        .containsEntry("depositReleased", "30.00");
+    assertThat(response.getBody().get("endedAt")).isNotNull();
+  }
+
+  @Test
+  void end_atAFullHub_is409OnHubIdWithTheNearbyHubsWithRoom() {
+    UUID full = operator.hub("bkapi-full", 1);
+    operator.bike("bkapi-filler", full);
+    Object id = startBike(60).getBody().get("id");
+
+    ResponseEntity<Map<String, Object>> response = end(ana, id, full);
+
+    assertRefusedOn(response, HttpStatus.CONFLICT, "hubId");
+    List<Object> nearby =
+        ((List<?>) response.getBody().get("nearbyHubs"))
+            .stream().map(h -> (Object) ((Map<?, ?>) h).get("code")).toList();
+    assertThat(nearby).contains("bkapi-hub").doesNotContain("bkapi-full");
+    assertThat(read(ana, id).getBody())
+        .containsEntry("state", "ACTIVE")
+        .extractingByKey("fullHubAttemptAt")
+        .isNotNull();
+  }
+
+  @Test
+  void end_reservedBooking_is409OnBooking() {
+    Object id = reserveBike(ana, 60, 120).getBody().get("id");
+
+    ResponseEntity<Map<String, Object>> response = end(ana, id, hub);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(FleetApi.errors(response)).containsEntry("booking", "is not Active");
+  }
+
+  @Test
+  void end_anotherTouristsRide_is403() {
+    Object id = startBike(60).getBody().get("id");
+
+    assertThat(end(bruno(), id, hub).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+  }
+
+  @Test
+  void end_withoutAHub_is400OnHubId() {
+    Object id = startBike(60).getBody().get("id");
+
+    assertRefusedOn(end(ana, id, null), HttpStatus.BAD_REQUEST, "hubId");
+  }
 }

@@ -62,3 +62,8 @@ export function buyPass(pass: NewPass, token: string): Promise<Pass> {
   }
   return requestJson<Pass>("/passes", { method: "POST", body, token });
 }
+
+/** The tourist's own passes (GET /passes); US05 uses them to bound a booking for later (BR4). */
+export function listPasses(token: string): Promise<Pass[]> {
+  return requestJson<Pass[]>("/passes", { token });
+}

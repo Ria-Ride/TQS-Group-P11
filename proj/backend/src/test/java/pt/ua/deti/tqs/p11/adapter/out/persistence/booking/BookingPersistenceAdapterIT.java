@@ -37,6 +37,7 @@ class BookingPersistenceAdapterIT {
       new BookingRules(
           Money.of("30.00"),
           Duration.ofMinutes(15),
+          Duration.ofMinutes(15),
           Duration.ofMinutes(10),
           Duration.ofMinutes(15),
           Money.of("2.00"));
@@ -169,6 +170,7 @@ class BookingPersistenceAdapterIT {
         new BookingRules(
             Money.of("50.00"),
             Duration.ofMinutes(20),
+            Duration.ofMinutes(15),
             Duration.ofMinutes(5),
             Duration.ofMinutes(30),
             Money.of("3.50"));
@@ -196,6 +198,65 @@ class BookingPersistenceAdapterIT {
 
     assertThat(bookings.findOngoingByAccount(ana)).containsExactly(riding);
     assertThat(bookings.findOngoingByAccount(UUID.randomUUID())).isEmpty();
+  }
+
+  // ------------------------------------------------------------- US05 queries
+
+  private Booking reserved(Instant start, String depositReference) {
+    return Booking.reserve(
+        UUID.randomUUID(), terms(start, Duration.ofMinutes(60)), RULES, depositReference);
+  }
+
+  /** BR7: the candidates for expiry; whether each is past its window is decided by Booking. */
+  @Test
+  void findReservedStartingBefore_returnsOnlyReservedBookingsPlannedBeforeThatMoment() {
+    Booking due = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(due);
+    Instant afterItsStart = NOW.plus(Duration.ofHours(1)).plusSeconds(1);
+
+    assertThat(bookings.findReservedStartingBefore(afterItsStart)).containsExactly(due);
+    assertThat(bookings.findReservedStartingBefore(NOW.plus(Duration.ofHours(1)))).isEmpty();
+  }
+
+  @Test
+  void findReservedStartingBefore_leavesOutBookingsThatAreNotReserved() {
+    Booking cancelled = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(cancelled);
+    bookings.save(cancelled.cancel("plans changed"));
+    bookings.save(active(NOW, "au_2"));
+
+    assertThat(bookings.findReservedStartingBefore(NOW.plus(Duration.ofDays(1)))).isEmpty();
+  }
+
+  /** BR18: the reservation a fault of the vehicle cancels. */
+  @Test
+  void findReservedOfVehicle_findsOnlyItsReservedBooking() {
+    Booking held = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(held);
+
+    assertThat(bookings.findReservedOfVehicle(bike)).contains(held);
+    assertThat(bookings.findReservedOfVehicle(UUID.randomUUID())).isEmpty();
+  }
+
+  @Test
+  void findReservedOfVehicle_activeBookingOfTheVehicle_isNotAReservation() {
+    bookings.save(active(NOW, "au_1"));
+
+    assertThat(bookings.findReservedOfVehicle(bike)).isEmpty();
+  }
+
+  /** GET /bookings: every booking of the account, latest planned start first. */
+  @Test
+  void findByAccount_returnsEveryBookingOfTheAccountLatestFirst() {
+    Booking earlier = active(NOW, "au_1");
+    bookings.save(earlier);
+    Booking completed = earlier.complete(otherHub, NOW.plus(Duration.ofMinutes(70)));
+    bookings.save(completed);
+    Booking later = reserved(NOW.plus(Duration.ofHours(3)), "au_2");
+    bookings.save(later);
+
+    assertThat(bookings.findByAccount(ana)).containsExactly(later, completed);
+    assertThat(bookings.findByAccount(UUID.randomUUID())).isEmpty();
   }
 
   // ------------------------------------------------------------- database rules
@@ -235,9 +296,9 @@ class BookingPersistenceAdapterIT {
             jdbc.update(
                 "INSERT INTO bookings (id, account_id, vehicle_id, pass_id, start_hub_id,"
                     + " planned_start, planned_end, deposit_reference, deposit_amount,"
-                    + " start_window_seconds, overtime_grace_seconds, overtime_block_seconds,"
+                    + " start_window_seconds, repositioning_window_seconds, overtime_grace_seconds, overtime_block_seconds,"
                     + " overtime_price_per_block, state)"
-                    + " VALUES (?, ?, ?, ?, ?, ?, ?, 'au_9', 30.00, 900, 600, 900, 2.00,"
+                    + " VALUES (?, ?, ?, ?, ?, ?, ?, 'au_9', 30.00, 900, 900, 600, 900, 2.00,"
                     + " 'ACTIVE')",
                 UUID.randomUUID(),
                 ana,
@@ -246,6 +307,37 @@ class BookingPersistenceAdapterIT {
                 hub,
                 Timestamp.from(NOW),
                 Timestamp.from(NOW.plus(Duration.ofMinutes(60)))))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  // ------------------------------------------------------------- US06: the end of a ride
+
+  /** BR15, BR21: the first full-hub refusal and the repositioning window are read back. */
+  @Test
+  void save_rideRefusedAtAFullHubThenEnded_keepsTheAttemptAndTheWindow() {
+    Booking riding = active(NOW, "au_1");
+    bookings.save(riding);
+    Booking tried = riding.recordFullHubAttempt(NOW.plus(Duration.ofMinutes(65)));
+    bookings.save(tried);
+
+    Booking ended = tried.complete(otherHub, NOW.plus(Duration.ofMinutes(70)));
+    bookings.save(ended);
+
+    assertThat(bookings.findById(riding.id())).contains(ended);
+    assertThat(bookings.findById(riding.id()).orElseThrow().rules().repositioningWindow())
+        .isEqualTo(RULES.repositioningWindow());
+  }
+
+  @Test
+  void database_refusesAFullHubAttemptOnAReservation() {
+    Booking reserved = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(reserved);
+
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "UPDATE bookings SET full_hub_attempt_at = ? WHERE id = ?",
+                Timestamp.from(NOW),
+                reserved.id()))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

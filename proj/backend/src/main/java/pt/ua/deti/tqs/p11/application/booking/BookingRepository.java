@@ -1,5 +1,6 @@
 package pt.ua.deti.tqs.p11.application.booking;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,4 +16,13 @@ public interface BookingRepository {
 
   /** BR6: the account's Reserved and Active bookings, earliest planned start first. */
   List<Booking> findOngoingByAccount(UUID accountId);
+
+  /** BR7: the Reserved bookings planned to start before this moment; some may still be in time. */
+  List<Booking> findReservedStartingBefore(Instant at);
+
+  /** BR3, BR18: a vehicle has at most one Reserved booking. */
+  Optional<Booking> findReservedOfVehicle(UUID vehicleId);
+
+  /** The account's bookings, latest planned start first. */
+  List<Booking> findByAccount(UUID accountId);
 }

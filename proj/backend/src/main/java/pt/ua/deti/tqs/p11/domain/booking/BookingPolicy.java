@@ -57,6 +57,29 @@ public final class BookingPolicy {
     return pass;
   }
 
+  /**
+   * US05: a booking for a later start. It must start after now, then the rules of check() apply to
+   * its planned period: the Pass must be valid at the planned start, not now (BR4).
+   *
+   * @return the Pass that covers the booking
+   * @throws BookingRefusedException START_NOT_IN_THE_FUTURE, or the first rule of check() that
+   *     fails
+   */
+  public PassCoverage checkReservation(
+      Vehicle vehicle,
+      Instant now,
+      Instant start,
+      Instant end,
+      List<PassCoverage> passes,
+      List<Booking> bookingsOfTheAccount) {
+    Objects.requireNonNull(now, "now");
+    Objects.requireNonNull(start, "start");
+    if (!start.isAfter(now)) {
+      throw new BookingRefusedException(BookingRefusal.START_NOT_IN_THE_FUTURE);
+    }
+    return check(vehicle, start, end, passes, bookingsOfTheAccount);
+  }
+
   /** BR5: above 0 and at most maxBookingDuration, to the second. */
   private Duration checkDuration(Instant start, Instant end) {
     if (!end.isAfter(start)) {

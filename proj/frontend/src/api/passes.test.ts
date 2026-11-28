@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { buyPass, listPassTypes, quotePrice } from "./passes";
+import { buyPass, listPasses, listPassTypes, quotePrice } from "./passes";
 
 const TOKEN = "token-for-ana";
 const DAY_ID = "7a1e0000-0000-4000-8000-000000000001";
@@ -70,5 +70,15 @@ describe("passes API", () => {
     await buyPass({ passTypeId: DAY_ID, stayCode: null, paymentToken: "tok_decline" }, TOKEN);
 
     expect(sentRequest().body).toEqual({ passTypeId: DAY_ID, paymentToken: "tok_decline" });
+  });
+
+  it("lists the tourist's own passes (US05: a booking must fit in one)", async () => {
+    await listPasses(TOKEN);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/passes");
+    expect(init.method).toBe("GET");
+    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
   });
 });

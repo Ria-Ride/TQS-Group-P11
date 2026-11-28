@@ -108,6 +108,23 @@ public class BookingSteps {
     rulesOfUse.save(TestRules.bookingRules(2, Instant.now()));
   }
 
+  // ------------------------------------------------------------- shared with ReservationSteps
+
+  /** US05: the scenario's "now" is the fixed platform clock, not the moment the scenario began. */
+  void useNow(Instant at) {
+    now = at;
+  }
+
+  /** US05: a booking made by another step, so the deposit and unlock checks here apply to it. */
+  void remember(ResponseEntity<Map<String, Object>> booking) {
+    lastStart = booking;
+  }
+
+  /** US06: the body of the last booking a step made here or remembered, or null. */
+  Map<String, Object> lastBooking() {
+    return lastStart == null ? null : lastStart.getBody();
+  }
+
   // ------------------------------------------------------------- helpers
 
   private void removeTheLaterRules() {
@@ -134,15 +151,15 @@ public class BookingSteps {
     return unlocks;
   }
 
-  private Registered tourist(String name) {
+  Registered tourist(String name) {
     return passSteps.tourist(name);
   }
 
-  private UUID idOf(String table, String code) {
+  UUID idOf(String table, String code) {
     return jdbc.queryForObject("SELECT id FROM " + table + " WHERE code = ?", UUID.class, code);
   }
 
-  private void insertPass(UUID account, UUID passType, Instant from, Instant to) {
+  void insertPass(UUID account, UUID passType, Instant from, Instant to) {
     jdbc.update(
         "INSERT INTO passes (id, account_id, pass_type_id, price, valid_from, valid_to)"
             + " VALUES (?, ?, ?, 10.00, ?, ?)",
@@ -183,7 +200,7 @@ public class BookingSteps {
         .toEntity(ApiClient.JSON_OBJECT);
   }
 
-  private int count(String sql, Object... args) {
+  int count(String sql, Object... args) {
     Integer found = jdbc.queryForObject(sql, Integer.class, args);
     return found == null ? 0 : found;
   }
@@ -194,9 +211,9 @@ public class BookingSteps {
   }
 
   /** How each refusal of the feature reaches the client (ApiExceptionHandler, decision D4). */
-  private record Refusal(HttpStatus status, String field, String message) {}
+  record Refusal(HttpStatus status, String field, String message) {}
 
-  private static Refusal refusal(String reason) {
+  static Refusal refusal(String reason) {
     if (reason.endsWith(RIDE_OVERLAP)) {
       return new Refusal(
           HttpStatus.CONFLICT, "booking", "you already have a booking in that period");
@@ -256,9 +273,13 @@ public class BookingSteps {
 
   @Given("{string} has started using {string} for {int} minutes")
   public void hasStartedUsing(String name, String vehicle, int minutes) {
-    assertThat(start(tourist(name).token(), vehicle, minutes, "tok_approve").getStatusCode())
+    ResponseEntity<Map<String, Object>> started =
+        start(tourist(name).token(), vehicle, minutes, "tok_approve");
+    assertThat(started.getStatusCode())
         .as("setup: %s starts using %s", name, vehicle)
         .isEqualTo(HttpStatus.CREATED);
+    // US06: the ride the scenario goes on to end.
+    lastStart = started;
   }
 
   @Given("{int} tourists with a valid {string} pass")

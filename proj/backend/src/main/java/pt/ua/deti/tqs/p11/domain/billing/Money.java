@@ -14,6 +14,9 @@ public record Money(BigDecimal amount) {
   /** The platform charges in one currency only. */
   public static final String CURRENCY = "EUR";
 
+  /** No money: nothing to charge. */
+  public static final Money ZERO = new Money(BigDecimal.ZERO);
+
   private static final int CENTS = 2;
   private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
@@ -45,6 +48,37 @@ public record Money(BigDecimal amount) {
     }
     BigDecimal kept = HUNDRED.subtract(BigDecimal.valueOf(percent));
     return new Money(amount.multiply(kept).divide(HUNDRED, CENTS, RoundingMode.HALF_UP));
+  }
+
+  /**
+   * BR12: the price of {@code times} overtime blocks.
+   *
+   * @throws IllegalArgumentException if times is negative
+   */
+  public Money times(long times) {
+    if (times < 0) {
+      throw new IllegalArgumentException(
+          "Cannot multiply an amount by a negative number: " + times);
+    }
+    return new Money(amount.multiply(BigDecimal.valueOf(times)));
+  }
+
+  /**
+   * BR13: what is left of a deposit after part of it is taken.
+   *
+   * @throws IllegalArgumentException if other is more than this amount (money is never negative)
+   */
+  public Money minus(Money other) {
+    return new Money(amount.subtract(other.amount));
+  }
+
+  /** BR13: this amount, but never more than {@code cap}. */
+  public Money atMost(Money cap) {
+    return amount.compareTo(cap.amount) <= 0 ? this : cap;
+  }
+
+  public boolean isZero() {
+    return amount.signum() == 0;
   }
 
   /** The amount with two decimals, as clients show it ("9.00"). */

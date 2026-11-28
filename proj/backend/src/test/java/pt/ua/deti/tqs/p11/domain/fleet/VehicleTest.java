@@ -109,6 +109,57 @@ class VehicleTest {
   }
 
   @Test
+  void reserve_availableVehicle_isReservedAndStaysAtTheHub() {
+    Vehicle vehicle = registeredAtHub03().activate().withBattery(BatteryLevel.of(80)).reserve();
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.RESERVED);
+    assertThat(vehicle.currentHub()).contains(HUB_03);
+    assertThat(vehicle.battery()).contains(BatteryLevel.of(80));
+  }
+
+  @Test
+  void startUse_reservedVehicle_isInUseAndLeavesTheHub() {
+    Vehicle vehicle = registeredAtHub03().activate().reserve().startUse();
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.IN_USE);
+    assertThat(vehicle.currentHub()).isEmpty();
+  }
+
+  @Test
+  void release_reservedVehicle_isAvailableAtTheSameHub() {
+    Vehicle vehicle = registeredAtHub03().activate().reserve().release();
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.AVAILABLE);
+    assertThat(vehicle.currentHub()).contains(HUB_03);
+  }
+
+  @Test
+  void release_availableVehicle_isRefused() {
+    Vehicle available = registeredAtHub03().activate();
+
+    assertThatThrownBy(available::release).isInstanceOf(ForbiddenTransitionException.class);
+  }
+
+  /** US06: the ride may end at any hub, not only the one it started from. */
+  @Test
+  void endUse_vehicleInUse_isAvailableAtTheHubWhereItEnded() {
+    UUID otherHub = UUID.randomUUID();
+
+    Vehicle vehicle = registeredAtHub03().activate().startUse().endUse(otherHub);
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.AVAILABLE);
+    assertThat(vehicle.currentHub()).contains(otherHub);
+  }
+
+  @Test
+  void endUse_vehicleNotInUse_isRefused() {
+    Vehicle available = registeredAtHub03().activate();
+
+    assertThatThrownBy(() -> available.endUse(HUB_03))
+        .isInstanceOf(ForbiddenTransitionException.class);
+  }
+
+  @Test
   void reportFault_reservedVehicle_goesToMaintenanceAtTheSameHub() {
     Vehicle reserved = new Vehicle(ID, CODE, VehicleType.E_BIKE, VehicleState.RESERVED, HUB_03);
 

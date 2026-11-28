@@ -16,12 +16,13 @@ import java.util.UUID;
  *       booking unless it was never created; deposit, DECLINED: reason, no booking.
  * </ul>
  *
- * <p>A captured deposit needs the amount taken; US06 adds it with the overtime charge.
+ * <li>deposit, CAPTURED: reference, booking and the amount taken from it (BR13, US06).
  *
  * @param reference the gateway's id of the charge or deposit; null when nothing went through
  * @param reason why no money was taken or held (card_declined, timeout, ...)
  * @param pass the pass a pass payment paid for
  * @param booking the booking a deposit belongs to
+ * @param captured how much of a captured deposit was taken; null for any other payment
  */
 public record Payment(
     UUID id,
@@ -33,7 +34,8 @@ public record Payment(
     String reason,
     UUID pass,
     UUID booking,
-    Instant at) {
+    Instant at,
+    Money captured) {
 
   public Payment {
     Objects.requireNonNull(id, "id");
@@ -44,8 +46,13 @@ public record Payment(
     Objects.requireNonNull(at, "at");
     boolean valid =
         switch (kind) {
-          case PASS -> booking == null && passFieldsMatch(state, reference, reason, pass);
-          case DEPOSIT -> pass == null && depositFieldsMatch(state, reference, reason, booking);
+          case PASS ->
+              booking == null
+                  && captured == null
+                  && passFieldsMatch(state, reference, reason, pass);
+          case DEPOSIT ->
+              pass == null
+                  && depositFieldsMatch(state, reference, reason, booking, amount, captured);
         };
     if (!valid) {
       throw new IllegalArgumentException(
@@ -64,12 +71,24 @@ public record Payment(
   }
 
   private static boolean depositFieldsMatch(
-      PaymentState state, String reference, String reason, UUID booking) {
+      PaymentState state,
+      String reference,
+      String reason,
+      UUID booking,
+      Money deposit,
+      Money taken) {
     return switch (state) {
-      case AUTHORIZED -> reference != null && booking != null && reason == null;
-      case RELEASED -> reference != null && reason == null;
-      case DECLINED -> reason != null && booking == null;
-      case CAPTURED -> false;
+      case AUTHORIZED -> reference != null && booking != null && reason == null && taken == null;
+      case RELEASED -> reference != null && reason == null && taken == null;
+      case DECLINED -> reason != null && booking == null && taken == null;
+      // BR13: something was taken, and never more than the deposit.
+      case CAPTURED ->
+          reference != null
+              && booking != null
+              && reason == null
+              && taken != null
+              && !taken.isZero()
+              && taken.atMost(deposit).equals(taken);
     };
   }
 
@@ -87,7 +106,8 @@ public record Payment(
         null,
         passId,
         null,
-        at);
+        at,
+        null);
   }
 
   public static Payment declined(UUID id, UUID accountId, Money amount, String reason, Instant at) {
@@ -101,7 +121,8 @@ public record Payment(
         reason,
         null,
         null,
-        at);
+        at,
+        null);
   }
 
   // ------------------------------------------------------------- deposits (US04)
@@ -119,7 +140,8 @@ public record Payment(
         null,
         null,
         bookingId,
-        at);
+        at,
+        null);
   }
 
   /** BR11: declined or no answer in time, so no booking was created. */
@@ -135,7 +157,8 @@ public record Payment(
         reason,
         null,
         null,
-        at);
+        at,
+        null);
   }
 
   /**
@@ -155,7 +178,42 @@ public record Payment(
         null,
         null,
         bookingId,
-        at);
+        at,
+        null);
+  }
+
+  /**
+   * BR13: the overtime charge was taken from the deposit (at most all of it) and the gateway gave
+   * the rest back in the same step.
+   *
+   * @param deposit the deposit that was held
+   * @param taken how much of it was taken: more than zero, at most the deposit
+   */
+  public static Payment depositCaptured(
+      UUID id,
+      UUID accountId,
+      Money deposit,
+      Money taken,
+      String reference,
+      UUID bookingId,
+      Instant at) {
+    return new Payment(
+        id,
+        accountId,
+        PaymentKind.DEPOSIT,
+        deposit,
+        PaymentState.CAPTURED,
+        reference,
+        null,
+        null,
+        bookingId,
+        at,
+        taken);
+  }
+
+  /** BR13: how much of a captured deposit was taken; empty for any other payment. */
+  public Optional<Money> capturedAmount() {
+    return Optional.ofNullable(captured);
   }
 
   public Optional<String> gatewayReference() {

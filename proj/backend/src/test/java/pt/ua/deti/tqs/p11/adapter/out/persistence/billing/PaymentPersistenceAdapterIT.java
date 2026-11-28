@@ -86,8 +86,9 @@ class PaymentPersistenceAdapterIT {
     jdbc.update(
         "INSERT INTO bookings (id, account_id, vehicle_id, pass_id, start_hub_id, planned_start,"
             + " planned_end, deposit_reference, deposit_amount, start_window_seconds,"
+            + " repositioning_window_seconds,"
             + " overtime_grace_seconds, overtime_block_seconds, overtime_price_per_block, state,"
-            + " started_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'au_1', 30.00, 900, 600, 900, 2.00,"
+            + " started_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'au_1', 30.00, 900, 900, 600, 900, 2.00,"
             + " 'ACTIVE', ?)",
         id,
         ana,
@@ -103,7 +104,7 @@ class PaymentPersistenceAdapterIT {
   private Map<String, Object> row(UUID id) {
     return jdbc.queryForMap(
         "SELECT account_id, kind, pass_id, booking_id, amount, state, gateway_reference,"
-            + " failure_reason, created_at FROM payments WHERE id = ?",
+            + " failure_reason, created_at, captured_amount FROM payments WHERE id = ?",
         id);
   }
 
@@ -218,6 +219,64 @@ class PaymentPersistenceAdapterIT {
         Payment.depositAuthorized(UUID.randomUUID(), ana, Money.of("30.00"), "au_2", booking, AT);
 
     assertThatThrownBy(() -> payments.save(second))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  // ------------------------------------------------------------- US05: give a deposit back
+
+  @Test
+  void findDepositOfBooking_readsTheHeldDepositBack() {
+    Payment held =
+        Payment.depositAuthorized(UUID.randomUUID(), ana, Money.of("30.00"), "au_1", booking, AT);
+    payments.save(held);
+
+    assertThat(payments.findDepositOfBooking(booking)).contains(held);
+  }
+
+  /** A release keeps the same payment, now RELEASED: one row per deposit. */
+  @Test
+  void findDepositOfBooking_afterTheRelease_readsTheReleasedDeposit() {
+    UUID id = UUID.randomUUID();
+    payments.save(Payment.depositAuthorized(id, ana, Money.of("30.00"), "au_1", booking, AT));
+    Payment released = Payment.depositReleased(id, ana, Money.of("30.00"), "au_1", booking, AT);
+
+    payments.save(released);
+
+    assertThat(payments.findDepositOfBooking(booking)).contains(released);
+  }
+
+  @Test
+  void findDepositOfBooking_bookingWithoutADeposit_isEmpty() {
+    assertThat(payments.findDepositOfBooking(UUID.randomUUID())).isEmpty();
+  }
+
+  // ------------------------------------------------------------- US06: capture
+
+  /** BR13: the capture keeps the same payment, now CAPTURED with the amount taken. */
+  @Test
+  void save_capturedDeposit_keepsTheAmountTaken() {
+    UUID id = UUID.randomUUID();
+    payments.save(Payment.depositAuthorized(id, ana, Money.of("30.00"), "au_1", booking, AT));
+    Payment captured =
+        Payment.depositCaptured(id, ana, Money.of("30.00"), Money.of("4.00"), "au_1", booking, AT);
+
+    payments.save(captured);
+
+    assertThat(payments.findDepositOfBooking(booking)).contains(captured);
+    assertThat(row(id))
+        .containsEntry("state", "CAPTURED")
+        .containsEntry("captured_amount", new BigDecimal("4.00"));
+  }
+
+  /** BR13: never more than the deposit, whoever writes the row. */
+  @Test
+  void database_refusesACaptureAboveTheDeposit() {
+    UUID id = UUID.randomUUID();
+    payments.save(Payment.depositAuthorized(id, ana, Money.of("30.00"), "au_1", booking, AT));
+
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "UPDATE payments SET state = 'CAPTURED', captured_amount = 30.01 WHERE id = ?", id))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

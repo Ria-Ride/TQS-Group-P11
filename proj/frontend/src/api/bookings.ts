@@ -1,4 +1,4 @@
-import { requestJson } from "./client";
+import { ApiError, requestJson } from "./client";
 import type { VehicleType } from "./fleet";
 
 /** A vehicle type and the deposit a ride on it holds (BR11), with cents ("30.00"). */
@@ -15,9 +15,20 @@ export interface NewRide {
   paymentToken: string;
 }
 
+/** US05: a booking for a later period; plannedStart must be in the future. */
+export interface NewReservation extends NewRide {
+  plannedStart: string;
+}
+
 export type BookingState = "RESERVED" | "ACTIVE" | "COMPLETED" | "CANCELLED" | "EXPIRED";
 
-/** A booking (US04). Times are ISO instants in UTC; startedAt is null until it is started. */
+/**
+ * A booking (US04, US05). Times are ISO instants in UTC. startedAt is null until it is started;
+ * startWindowEndsAt is the last moment a Reserved booking can be started (BR7), null otherwise;
+ * fullHubAttemptAt is the first refused end at a full hub (BR15); endedAt, endHubId and the
+ * settlement (overtime charge, what the deposit paid and what was given back) are set once the
+ * ride has ended (US06); cancelReason is set only when Cancelled.
+ */
 export interface Booking {
   id: string;
   state: BookingState;
@@ -26,7 +37,15 @@ export interface Booking {
   startHubId: string;
   plannedStart: string;
   plannedEnd: string;
+  startWindowEndsAt: string | null;
   startedAt: string | null;
+  fullHubAttemptAt: string | null;
+  endedAt: string | null;
+  endHubId: string | null;
+  overtimeCharge: string | null;
+  depositCaptured: string | null;
+  depositReleased: string | null;
+  cancelReason: string | null;
   deposit: string;
   currency: string;
 }
@@ -42,4 +61,64 @@ export function listVehicleTypes(token: string): Promise<VehicleTypeDeposit[]> {
  */
 export function startRide(ride: NewRide, token: string): Promise<Booking> {
   return requestJson<Booking>("/bookings", { method: "POST", body: ride, token });
+}
+
+/**
+ * US05: books the vehicle for a later period. The vehicle and the booking are Reserved and the
+ * deposit is held (BR11) until the booking is started, cancelled or expires (BR7).
+ */
+export function bookForLater(reservation: NewReservation, token: string): Promise<Booking> {
+  return requestJson<Booking>("/bookings", { method: "POST", body: reservation, token });
+}
+
+/** The tourist's bookings, latest planned start first. */
+export function listBookings(token: string): Promise<Booking[]> {
+  return requestJson<Booking[]>("/bookings", { token });
+}
+
+/** BR7: starts a Reserved booking inside its window; the vehicle is then unlocked. */
+export function startBooking(id: string, token: string): Promise<Booking> {
+  return requestJson<Booking>(`/bookings/${encodeURIComponent(id)}/start`, {
+    method: "POST",
+    body: {},
+    token,
+  });
+}
+
+/** BR13: cancels a Reserved booking; the whole deposit is given back. */
+export function cancelBooking(id: string, token: string): Promise<Booking> {
+  return requestJson<Booking>(`/bookings/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+    body: {},
+    token,
+  });
+}
+
+/** BR15: a hub with room, suggested when the chosen one is full. */
+export interface NearbyHub {
+  id: string;
+  code: string;
+  name: string;
+  freeSlots: number;
+  distanceMeters: number;
+}
+
+/**
+ * US06: ends the ride at a hub. The vehicle is locked first; the deposit then pays the overtime
+ * (BR12, BR13). A full hub refuses with 409 and suggests hubs with room (see nearbyHubsOf).
+ */
+export function endRide(id: string, hubId: string, token: string): Promise<Booking> {
+  return requestJson<Booking>(`/bookings/${encodeURIComponent(id)}/end`, {
+    method: "POST",
+    body: { hubId },
+    token,
+  });
+}
+
+/** The hubs a refused end at a full hub suggests, nearest first; empty for any other failure. */
+export function nearbyHubsOf(failure: unknown): NearbyHub[] {
+  if (!(failure instanceof ApiError) || !Array.isArray(failure.body.nearbyHubs)) {
+    return [];
+  }
+  return failure.body.nearbyHubs as NearbyHub[];
 }

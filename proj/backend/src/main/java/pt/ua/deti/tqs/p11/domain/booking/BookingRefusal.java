@@ -18,5 +18,11 @@ public enum BookingRefusal {
   /** BR4: a Pass allows the type, but none is still valid when the ride ends. */
   RIDE_ENDS_AFTER_PASS,
   /** BR6: the tourist has a Reserved booking in that period, or is riding. */
-  OVERLAPPING_BOOKING
+  OVERLAPPING_BOOKING,
+  /** US05: a booking for a later start must start after now; one starting now is US04. */
+  START_NOT_IN_THE_FUTURE,
+  /** BR7: a reservation cannot be started before its planned start. */
+  TOO_EARLY_TO_START,
+  /** BR7: a reservation cannot be started after its start window; it expires instead. */
+  START_WINDOW_PASSED
 }

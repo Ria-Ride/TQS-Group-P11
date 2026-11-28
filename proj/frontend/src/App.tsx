@@ -5,6 +5,7 @@ import { ClientPage } from "./pages/ClientPage";
 import { FleetPage } from "./pages/FleetPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { MyBookingsPage } from "./pages/MyBookingsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SearchPage } from "./pages/SearchPage";
 import { TechnicianTicketsPage } from "./pages/TechnicianTicketsPage";
@@ -18,6 +19,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/vehicles/search" element={<SearchPage />} />
       <Route path="/passes/buy" element={<BuyPassPage />} />
+      <Route path="/bookings" element={<MyBookingsPage />} />
       <Route path="/client" element={<ClientPage />} />
       <Route path="/admin/users" element={<AdminUsersPage />} />
       <Route path="/operator/fleet" element={<FleetPage />} />
