@@ -120,6 +120,11 @@ public class BookingSteps {
     lastStart = booking;
   }
 
+  /** US06: the body of the last booking a step made here or remembered, or null. */
+  Map<String, Object> lastBooking() {
+    return lastStart == null ? null : lastStart.getBody();
+  }
+
   // ------------------------------------------------------------- helpers
 
   private void removeTheLaterRules() {
@@ -268,9 +273,13 @@ public class BookingSteps {
 
   @Given("{string} has started using {string} for {int} minutes")
   public void hasStartedUsing(String name, String vehicle, int minutes) {
-    assertThat(start(tourist(name).token(), vehicle, minutes, "tok_approve").getStatusCode())
+    ResponseEntity<Map<String, Object>> started =
+        start(tourist(name).token(), vehicle, minutes, "tok_approve");
+    assertThat(started.getStatusCode())
         .as("setup: %s starts using %s", name, vehicle)
         .isEqualTo(HttpStatus.CREATED);
+    // US06: the ride the scenario goes on to end.
+    lastStart = started;
   }
 
   @Given("{int} tourists with a valid {string} pass")

@@ -61,7 +61,8 @@ class PaymentTest {
                 null,
                 null,
                 null,
-                AT))
+                AT,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -78,7 +79,8 @@ class PaymentTest {
                 null,
                 PASS,
                 null,
-                AT))
+                AT,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -96,7 +98,8 @@ class PaymentTest {
                 "timeout",
                 PASS,
                 null,
-                AT))
+                AT,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -113,7 +116,8 @@ class PaymentTest {
                 null,
                 null,
                 null,
-                AT))
+                AT,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -131,7 +135,8 @@ class PaymentTest {
                 null,
                 null,
                 null,
-                AT))
+                AT,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -197,7 +202,8 @@ class PaymentTest {
                 null,
                 PASS,
                 BOOKING,
-                AT))
+                AT,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -214,13 +220,44 @@ class PaymentTest {
                 "card_declined",
                 null,
                 BOOKING,
-                AT))
+                AT,
+                null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
-  /** A captured deposit needs the amount taken, which US06 adds with the overtime charge. */
+  /** BR13: a captured deposit keeps the deposit and how much of it was taken. */
   @Test
-  void new_capturedDeposit_isRefusedUntilTheCaptureIsModelled() {
+  void depositCaptured_keepsTheDepositAndTheAmountTaken() {
+    Payment deposit =
+        Payment.depositCaptured(ID, ANA, DEPOSIT, Money.of("4.00"), "au_1", BOOKING, AT);
+
+    assertThat(deposit.kind()).isEqualTo(PaymentKind.DEPOSIT);
+    assertThat(deposit.state()).isEqualTo(PaymentState.CAPTURED);
+    assertThat(deposit.amount()).isEqualTo(DEPOSIT);
+    assertThat(deposit.capturedAmount()).contains(Money.of("4.00"));
+    assertThat(deposit.bookingId()).contains(BOOKING);
+  }
+
+  @Test
+  void depositCaptured_theWholeDeposit_isAllowed() {
+    assertThat(
+            Payment.depositCaptured(ID, ANA, DEPOSIT, DEPOSIT, "au_1", BOOKING, AT)
+                .capturedAmount())
+        .contains(DEPOSIT);
+  }
+
+  /** Taking nothing is a release; taking more than the deposit is impossible (BR13). */
+  @ParameterizedTest(name = "captured {0}")
+  @CsvSource({"0.00", "30.01"})
+  void depositCaptured_nothingOrMoreThanTheDeposit_isRefused(String captured) {
+    Money taken = Money.of(captured);
+
+    assertThatThrownBy(() -> Payment.depositCaptured(ID, ANA, DEPOSIT, taken, "au_1", BOOKING, AT))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void new_capturedDepositWithoutTheAmountTaken_isRefused() {
     assertThatThrownBy(() ->
             new Payment(
                 ID,
@@ -232,7 +269,26 @@ class PaymentTest {
                 null,
                 null,
                 BOOKING,
-                AT))
+                AT,
+                null))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void new_amountTakenOnAPaymentThatIsNotACapturedDeposit_isRefused() {
+    assertThatThrownBy(() ->
+            new Payment(
+                ID,
+                ANA,
+                PaymentKind.DEPOSIT,
+                DEPOSIT,
+                PaymentState.AUTHORIZED,
+                "au_1",
+                null,
+                null,
+                BOOKING,
+                AT,
+                Money.of("4.00")))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -275,7 +331,7 @@ class PaymentTest {
     UUID bookingId = idOrNull(booking, BOOKING);
 
     assertThatThrownBy(
-            () -> new Payment(ID, ANA, kind, amount, state, ref, why, passId, bookingId, AT))
+            () -> new Payment(ID, ANA, kind, amount, state, ref, why, passId, bookingId, AT, null))
         .as(rule)
         .isInstanceOf(IllegalArgumentException.class);
   }

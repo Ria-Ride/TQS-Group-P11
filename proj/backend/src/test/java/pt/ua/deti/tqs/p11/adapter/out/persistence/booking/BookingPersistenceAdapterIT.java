@@ -37,6 +37,7 @@ class BookingPersistenceAdapterIT {
       new BookingRules(
           Money.of("30.00"),
           Duration.ofMinutes(15),
+          Duration.ofMinutes(15),
           Duration.ofMinutes(10),
           Duration.ofMinutes(15),
           Money.of("2.00"));
@@ -169,6 +170,7 @@ class BookingPersistenceAdapterIT {
         new BookingRules(
             Money.of("50.00"),
             Duration.ofMinutes(20),
+            Duration.ofMinutes(15),
             Duration.ofMinutes(5),
             Duration.ofMinutes(30),
             Money.of("3.50"));
@@ -294,9 +296,9 @@ class BookingPersistenceAdapterIT {
             jdbc.update(
                 "INSERT INTO bookings (id, account_id, vehicle_id, pass_id, start_hub_id,"
                     + " planned_start, planned_end, deposit_reference, deposit_amount,"
-                    + " start_window_seconds, overtime_grace_seconds, overtime_block_seconds,"
+                    + " start_window_seconds, repositioning_window_seconds, overtime_grace_seconds, overtime_block_seconds,"
                     + " overtime_price_per_block, state)"
-                    + " VALUES (?, ?, ?, ?, ?, ?, ?, 'au_9', 30.00, 900, 600, 900, 2.00,"
+                    + " VALUES (?, ?, ?, ?, ?, ?, ?, 'au_9', 30.00, 900, 900, 600, 900, 2.00,"
                     + " 'ACTIVE')",
                 UUID.randomUUID(),
                 ana,
@@ -305,6 +307,37 @@ class BookingPersistenceAdapterIT {
                 hub,
                 Timestamp.from(NOW),
                 Timestamp.from(NOW.plus(Duration.ofMinutes(60)))))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  // ------------------------------------------------------------- US06: the end of a ride
+
+  /** BR15, BR21: the first full-hub refusal and the repositioning window are read back. */
+  @Test
+  void save_rideRefusedAtAFullHubThenEnded_keepsTheAttemptAndTheWindow() {
+    Booking riding = active(NOW, "au_1");
+    bookings.save(riding);
+    Booking tried = riding.recordFullHubAttempt(NOW.plus(Duration.ofMinutes(65)));
+    bookings.save(tried);
+
+    Booking ended = tried.complete(otherHub, NOW.plus(Duration.ofMinutes(70)));
+    bookings.save(ended);
+
+    assertThat(bookings.findById(riding.id())).contains(ended);
+    assertThat(bookings.findById(riding.id()).orElseThrow().rules().repositioningWindow())
+        .isEqualTo(RULES.repositioningWindow());
+  }
+
+  @Test
+  void database_refusesAFullHubAttemptOnAReservation() {
+    Booking reserved = reserved(NOW.plus(Duration.ofHours(1)), "au_1");
+    bookings.save(reserved);
+
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "UPDATE bookings SET full_hub_attempt_at = ? WHERE id = ?",
+                Timestamp.from(NOW),
+                reserved.id()))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

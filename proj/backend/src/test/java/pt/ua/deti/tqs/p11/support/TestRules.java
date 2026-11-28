@@ -14,7 +14,8 @@ import pt.ua.deti.tqs.p11.domain.rules.VehicleTypeRules;
  * nor on what the client manager changed (US14): the longest booking is 4 hours; a ride needs the
  * 20% floor plus 5% per started 30 minutes (BR1); the deposit is 30.00 EUR for an E_BIKE and 50.00
  * EUR for an E_SCOOTER (BR11); a reservation can start up to 15 minutes late (BR7); overtime is
- * charged after 10 minutes of grace, at 2.00 EUR per started block of 15 minutes (BR12).
+ * charged after 10 minutes of grace, at 2.00 EUR per started block of 15 minutes (BR12); after a
+ * refused end at a full hub, the tourist has 15 minutes to end at another one (BR15).
  */
 public final class TestRules {
 
@@ -36,7 +37,7 @@ public final class TestRules {
         Duration.ofHours(4),
         BatteryLevel.of(20),
         Duration.ofMinutes(15),
-        Duration.ofMinutes(10),
+        Duration.ofMinutes(15),
         Duration.ofMinutes(10),
         Duration.ofMinutes(15),
         Money.of("2.00"),

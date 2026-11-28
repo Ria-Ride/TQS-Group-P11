@@ -21,15 +21,17 @@ class BookingRulesTest {
   private static final Money DEPOSIT = Money.of("30.00");
   private static final Money PRICE = Money.of("2.00");
   private static final Duration WINDOW = Duration.ofMinutes(15);
+  private static final Duration REPOSITIONING = Duration.ofMinutes(15);
   private static final Duration GRACE = Duration.ofMinutes(10);
   private static final Duration BLOCK = Duration.ofMinutes(15);
 
   @Test
   void new_keepsEveryValue() {
-    BookingRules rules = new BookingRules(DEPOSIT, WINDOW, GRACE, BLOCK, PRICE);
+    BookingRules rules = new BookingRules(DEPOSIT, WINDOW, REPOSITIONING, GRACE, BLOCK, PRICE);
 
     assertThat(rules.deposit()).isEqualTo(DEPOSIT);
     assertThat(rules.startWindow()).isEqualTo(WINDOW);
+    assertThat(rules.repositioningWindow()).isEqualTo(REPOSITIONING);
     assertThat(rules.overtimeGrace()).isEqualTo(GRACE);
     assertThat(rules.overtimeBlock()).isEqualTo(BLOCK);
     assertThat(rules.overtimePricePerBlock()).isEqualTo(PRICE);
@@ -42,12 +44,13 @@ class BookingRulesTest {
     RulesOfUse inForce = TestRules.bookingRules();
 
     assertThat(BookingRules.of(inForce, type))
-        .isEqualTo(new BookingRules(Money.of(deposit), WINDOW, GRACE, BLOCK, PRICE));
+        .isEqualTo(new BookingRules(Money.of(deposit), WINDOW, REPOSITIONING, GRACE, BLOCK, PRICE));
   }
 
   @Test
   void new_noGraceAndNoStartWindow_isAccepted() {
-    BookingRules rules = new BookingRules(DEPOSIT, Duration.ZERO, Duration.ZERO, BLOCK, PRICE);
+    BookingRules rules =
+        new BookingRules(DEPOSIT, Duration.ZERO, REPOSITIONING, Duration.ZERO, BLOCK, PRICE);
 
     assertThat(rules.overtimeGrace()).isZero();
     assertThat(rules.startWindow()).isZero();
@@ -55,27 +58,36 @@ class BookingRulesTest {
 
   @Test
   void new_negativeStartWindow_isRefused() {
-    assertThatThrownBy(() -> new BookingRules(DEPOSIT, Duration.ofMinutes(-1), GRACE, BLOCK, PRICE))
+    assertThatThrownBy(() ->
+            new BookingRules(DEPOSIT, Duration.ofMinutes(-1), REPOSITIONING, GRACE, BLOCK, PRICE))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void new_negativeRepositioningWindow_isRefused() {
+    assertThatThrownBy(
+            () -> new BookingRules(DEPOSIT, WINDOW, Duration.ofMinutes(-1), GRACE, BLOCK, PRICE))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void new_negativeGrace_isRefused() {
-    assertThatThrownBy(
-            () -> new BookingRules(DEPOSIT, WINDOW, Duration.ofMinutes(-1), BLOCK, PRICE))
+    assertThatThrownBy(() ->
+            new BookingRules(DEPOSIT, WINDOW, REPOSITIONING, Duration.ofMinutes(-1), BLOCK, PRICE))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   /** A block of zero minutes would make the overtime charge divide by zero (US06). */
   @Test
   void new_zeroBlock_isRefused() {
-    assertThatThrownBy(() -> new BookingRules(DEPOSIT, WINDOW, GRACE, Duration.ZERO, PRICE))
+    assertThatThrownBy(
+            () -> new BookingRules(DEPOSIT, WINDOW, REPOSITIONING, GRACE, Duration.ZERO, PRICE))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void new_withoutADeposit_isRefused() {
-    assertThatThrownBy(() -> new BookingRules(null, WINDOW, GRACE, BLOCK, PRICE))
+    assertThatThrownBy(() -> new BookingRules(null, WINDOW, REPOSITIONING, GRACE, BLOCK, PRICE))
         .isInstanceOf(NullPointerException.class);
   }
 }

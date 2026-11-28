@@ -141,6 +141,25 @@ public class VehicleLifecycleUseCase {
     return checkedChange(vehicleId, check, Vehicle::release);
   }
 
+  /**
+   * US06: a ride ends at a hub, as one atomic change (K3): the vehicle is locked, {@code check}
+   * runs on it (the booking is completed there), it goes from InUse to Available at that hub, and
+   * the hub is locked to count its free slot (BR14), vehicle before hub as always.
+   *
+   * @throws pt.ua.deti.tqs.p11.domain.fleet.HubFullException if the hub has no free slot
+   */
+  public Vehicle endUse(UUID vehicleId, UUID hubId, Consumer<Vehicle> check) {
+    Objects.requireNonNull(hubId, "hubId");
+    return checkedChange(
+        vehicleId,
+        check,
+        vehicle -> {
+          Vehicle ended = vehicle.endUse(hubId);
+          lockHubWithFreeSlot(hubId);
+          return ended;
+        });
+  }
+
   public List<VehicleStateChange> history(UUID vehicleId) {
     get(vehicleId);
     return history.findByVehicleId(vehicleId);

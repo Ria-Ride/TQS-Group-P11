@@ -17,6 +17,9 @@ import pt.ua.deti.tqs.p11.application.booking.BookingNotFoundException;
 import pt.ua.deti.tqs.p11.application.booking.BookingNotOwnedException;
 import pt.ua.deti.tqs.p11.application.booking.DepositDeclinedException;
 import pt.ua.deti.tqs.p11.application.booking.DepositTimedOutException;
+import pt.ua.deti.tqs.p11.application.booking.EndAtFullHubException;
+import pt.ua.deti.tqs.p11.application.booking.VehicleLockTimedOutException;
+import pt.ua.deti.tqs.p11.application.booking.VehicleNotLockedException;
 import pt.ua.deti.tqs.p11.application.fleet.HubCodeAlreadyInUseException;
 import pt.ua.deti.tqs.p11.application.fleet.HubNotFoundException;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleCodeAlreadyInUseException;
@@ -306,6 +309,44 @@ class ApiExceptionHandler {
           case COMPLETE -> "is not Active";
         };
     return problem(HttpStatus.CONFLICT, "The booking is refused", Map.of("booking", message));
+  }
+
+  // US06: ending a ride. In every case below the ride goes on and nothing is charged.
+
+  /** BR14, BR15: a full hub, with the nearest hubs that have room, nearest first. */
+  @ExceptionHandler(EndAtFullHubException.class)
+  ProblemDetail endAtFullHub(EndAtFullHubException e) {
+    ProblemDetail problem =
+        problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("hubId", "is full"));
+    problem.setProperty(
+        "nearbyHubs",
+        e.nearby().stream()
+            .map(nearby ->
+                Map.of(
+                    "id", nearby.hub().id(),
+                    "code", nearby.hub().code().value(),
+                    "name", nearby.hub().name(),
+                    "freeSlots", nearby.freeSlots(),
+                    "distanceMeters", Math.round(nearby.distanceMeters())))
+            .toList());
+    return problem;
+  }
+
+  /** The contract's reason (e.g. NOT_AT_HUB) is for the logs, not the tourist. */
+  @ExceptionHandler(VehicleNotLockedException.class)
+  ProblemDetail vehicleNotLocked(VehicleNotLockedException e) {
+    return problem(
+        HttpStatus.CONFLICT,
+        "The vehicle could not be locked",
+        Map.of("vehicleId", "could not be locked; check that it is parked in the hub"));
+  }
+
+  @ExceptionHandler(VehicleLockTimedOutException.class)
+  ProblemDetail vehicleLockTimedOut(VehicleLockTimedOutException e) {
+    return problem(
+        HttpStatus.GATEWAY_TIMEOUT,
+        e.getMessage(),
+        Map.of("vehicleId", "did not answer in time; try again"));
   }
 
   /** BR11: no answer in time, so no booking; the deposit was released. Trying again is safe. */

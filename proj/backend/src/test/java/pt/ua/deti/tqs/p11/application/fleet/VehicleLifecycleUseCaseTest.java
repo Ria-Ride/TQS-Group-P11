@@ -427,6 +427,40 @@ class VehicleLifecycleUseCaseTest {
     verifyNoInteractions(history);
   }
 
+  // ------------------------------------------------------------- US06: the end of a ride
+
+  private static Vehicle bikeInUse() {
+    return bikeAtHub03(VehicleState.AVAILABLE).startUse();
+  }
+
+  @Test
+  void endUse_hubWithAFreeSlot_makesTheVehicleAvailableThereAndRecordsIt() {
+    when(vehicles.findByIdForUpdate(BIKE_ID)).thenReturn(Optional.of(bikeInUse()));
+    when(hubs.findByIdForUpdate(HUB_05_ID)).thenReturn(Optional.of(HUB_05));
+    when(vehicles.countAtHub(HUB_05_ID)).thenReturn(0);
+    when(vehicles.save(any())).then(returnsFirstArg());
+
+    Vehicle vehicle = useCase.endUse(BIKE_ID, HUB_05_ID, locked -> {});
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.AVAILABLE);
+    assertThat(vehicle.currentHub()).contains(HUB_05_ID);
+    verify(history)
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.IN_USE, VehicleState.AVAILABLE, T0));
+  }
+
+  /** BR14: the slot is counted with the hub locked, so two ends cannot take the last one. */
+  @Test
+  void endUse_fullHub_isRefusedAndNothingIsSaved() {
+    when(vehicles.findByIdForUpdate(BIKE_ID)).thenReturn(Optional.of(bikeInUse()));
+    when(hubs.findByIdForUpdate(HUB_05_ID)).thenReturn(Optional.of(HUB_05));
+    when(vehicles.countAtHub(HUB_05_ID)).thenReturn(HUB_05.capacity());
+
+    assertThatThrownBy(() -> useCase.endUse(BIKE_ID, HUB_05_ID, locked -> {}))
+        .isInstanceOf(HubFullException.class);
+    verify(vehicles, never()).save(any());
+    verifyNoInteractions(history);
+  }
+
   /** US05: a Reserved vehicle may be started too, by its booking (Product Specs 3.3). */
   @Test
   void startUse_maintenanceVehicle_isRefusedAndNothingIsSaved() {

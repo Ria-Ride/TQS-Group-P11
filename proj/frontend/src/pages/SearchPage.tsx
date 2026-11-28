@@ -466,6 +466,9 @@ export function SearchPage() {
               <dd>{`${ride.booking.deposit} ${ride.booking.currency}`}</dd>
             </dl>
             <p>The vehicle is being unlocked.</p>
+            <p>
+              End the ride at any hub from <Link to="/bookings">My bookings</Link>.
+            </p>
           </section>
         )}
 

@@ -1,14 +1,17 @@
 package pt.ua.deti.tqs.p11.domain.booking;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * The right to use one vehicle (Product Specs 3.1, 3.3). Immutable: every transition returns a new
  * Booking, and the constructor checks that the state has exactly the fields it needs, so an invalid
  * Booking cannot exist. startedAt is set from Active on; endedAt and endHubId only when Completed;
- * cancelReason only when Cancelled.
+ * cancelReason only when Cancelled; fullHubAttemptAt, the first refused end at a full hub (BR15),
+ * only once started.
  *
  * @param depositReference the gateway's reference of the authorized deposit (BR11): a booking is
  *     created only after its deposit is authorized
@@ -22,7 +25,8 @@ public record Booking(
     Instant startedAt,
     Instant endedAt,
     UUID endHubId,
-    String cancelReason) {
+    String cancelReason,
+    Instant fullHubAttemptAt) {
 
   public Booking {
     Objects.requireNonNull(id, "id");
@@ -42,6 +46,10 @@ public record Booking(
     if (cancelReason != null && cancelReason.isBlank()) {
       throw new IllegalArgumentException("A cancelled booking needs a reason");
     }
+    if (fullHubAttemptAt != null && !started) {
+      throw new IllegalArgumentException(
+          "A %s booking cannot have a full-hub attempt".formatted(state));
+    }
     if (endedAt != null && endedAt.isBefore(startedAt)) {
       throw new IllegalArgumentException(
           "A booking cannot end before it starts: %s to %s".formatted(startedAt, endedAt));
@@ -60,6 +68,7 @@ public record Booking(
         terms.plannedStart(),
         null,
         null,
+        null,
         null);
   }
 
@@ -67,7 +76,7 @@ public record Booking(
   public static Booking reserve(
       UUID id, BookingTerms terms, BookingRules rules, String depositReference) {
     return new Booking(
-        id, terms, rules, depositReference, BookingState.RESERVED, null, null, null, null);
+        id, terms, rules, depositReference, BookingState.RESERVED, null, null, null, null, null);
   }
 
   /**
@@ -107,6 +116,51 @@ public record Booking(
     return state == BookingState.RESERVED && at.isAfter(startWindowEnd());
   }
 
+  /**
+   * BR15: an end at a full hub was refused at this moment. Only the first refusal is kept; the ride
+   * goes on (Active) until it ends at another hub.
+   *
+   * @throws BookingTransitionNotAllowedException if the booking is not Active
+   */
+  public Booking recordFullHubAttempt(Instant at) {
+    Objects.requireNonNull(at, "at");
+    if (state != BookingState.ACTIVE) {
+      throw new BookingTransitionNotAllowedException(state, BookingAction.COMPLETE);
+    }
+    if (fullHubAttemptAt != null) {
+      return this;
+    }
+    return new Booking(
+        id, terms, rules, depositReference, state, startedAt, endedAt, endHubId, cancelReason, at);
+  }
+
+  /**
+   * BR12, BR15: until when an ended ride is charged. The real end; or, when the ride ended within
+   * the repositioning window after a refused end at a full hub (the window's last second included),
+   * the moment of that refusal, so the tourist does not pay for looking for a free slot. Empty
+   * until the booking is Completed.
+   */
+  public Optional<Instant> chargedUntil() {
+    if (state != BookingState.COMPLETED) {
+      return Optional.empty();
+    }
+    if (fullHubAttemptAt != null
+        && !endedAt.isAfter(fullHubAttemptAt.plus(rules.repositioningWindow()))) {
+      return Optional.of(fullHubAttemptAt);
+    }
+    return Optional.of(endedAt);
+  }
+
+  /**
+   * BR12, BR13: the overtime charge of an ended ride, from its planned end to {@link
+   * #chargedUntil()}, and how the deposit pays it. Empty until the booking is Completed.
+   */
+  public Optional<Settlement> settlement() {
+    return chargedUntil()
+        .map(until -> Duration.between(terms.plannedEnd(), until))
+        .map(late -> Settlement.of(Overtime.charge(rules, late), rules.deposit()));
+  }
+
   public Booking cancel(String reason) {
     Objects.requireNonNull(reason, "reason");
     return with(state.after(BookingAction.CANCEL), null, null, null, reason);
@@ -118,7 +172,8 @@ public record Booking(
 
   private Booking with(
       BookingState next, Instant started, Instant ended, UUID endHub, String reason) {
-    return new Booking(id, terms, rules, depositReference, next, started, ended, endHub, reason);
+    return new Booking(
+        id, terms, rules, depositReference, next, started, ended, endHub, reason, fullHubAttemptAt);
   }
 
   /** The field must be there exactly when the state needs it. */

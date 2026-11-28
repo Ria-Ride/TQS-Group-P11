@@ -50,6 +50,9 @@ class PaymentJpaEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "captured_amount", precision = 10, scale = 2)
+  private BigDecimal capturedAmount;
+
   /** For JPA only. */
   protected PaymentJpaEntity() {}
 
@@ -65,6 +68,7 @@ class PaymentJpaEntity {
     entity.createdAt = payment.at();
     entity.kind = payment.kind();
     entity.bookingId = payment.bookingId().orElse(null);
+    entity.capturedAmount = payment.capturedAmount().map(Money::amount).orElse(null);
     return entity;
   }
 
@@ -80,6 +84,7 @@ class PaymentJpaEntity {
         failureReason,
         passId,
         bookingId,
-        createdAt);
+        createdAt,
+        capturedAmount == null ? null : new Money(capturedAmount));
   }
 }

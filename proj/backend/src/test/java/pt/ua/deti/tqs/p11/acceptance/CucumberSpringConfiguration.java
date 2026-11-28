@@ -25,7 +25,11 @@ import pt.ua.deti.tqs.p11.support.ShiftableClock;
 @CucumberContextConfiguration
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"app.telemetry.enabled=true", "app.bookings.expiry.enabled=false"})
+    properties = {
+      "app.telemetry.enabled=true",
+      "app.bookings.expiry.enabled=false",
+      "app.telemetry.command-response-timeout=PT2S"
+    })
 @Import({TestcontainersConfiguration.class, CucumberSpringConfiguration.ClockConfiguration.class})
 public class CucumberSpringConfiguration {
 
