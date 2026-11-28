@@ -107,6 +107,8 @@ telemetry off, commands are only logged and rides still start.
 
 A reading with a fault code opens a maintenance ticket (US10), due 24 hours later, and an Available
 or Reserved vehicle goes to Maintenance; the fault repeated by later readings opens no other ticket.
+A ride is not interrupted by a fault, but a vehicle whose ride ends with a ticket still open stays
+at that hub in Maintenance instead of being offered again.
 Operators see the open tickets, open one by hand and assign field technicians at
 `/operator/tickets` ("Maintenance tickets" on the home page). A vehicle with an open ticket cannot
 be activated. Field technicians (operators with `fieldTechnician` set) see their own tickets at

@@ -218,7 +218,8 @@ public record Vehicle(
    * free slot (BR14), are checked by the caller.
    */
   public Vehicle endUseForRepair(UUID hubId) {
-    throw new UnsupportedOperationException("KAN-733");
+    Objects.requireNonNull(hubId, "hubId");
+    return transition(VehicleAction.END_USE_FOR_REPAIR, hubId);
   }
 
   /**

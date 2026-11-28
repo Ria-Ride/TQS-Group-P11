@@ -62,7 +62,7 @@ class VehicleController {
               throw new InvalidFieldException(
                   "action", "is started by a booking once its deposit is held, not by an operator");
           // US05: a reservation holds and gives back the vehicle; the booking decides when.
-          case RESERVE, RELEASE, END_USE ->
+          case RESERVE, RELEASE, END_USE, END_USE_FOR_REPAIR ->
               throw new InvalidFieldException(
                   "action", "is done by a booking (US05, US06), not by an operator");
           // BR18: a fault reaches Maintenance only with its ticket (telemetry or POST /tickets).
@@ -73,7 +73,6 @@ class VehicleController {
           case RETURN_TO_SERVICE ->
               throw new InvalidFieldException(
                   "action", "happens when the vehicle's last open ticket is closed");
-          case END_USE_FOR_REPAIR -> throw new UnsupportedOperationException("KAN-733");
         };
     return VehicleResponse.from(vehicle);
   }

@@ -59,7 +59,7 @@ public enum VehicleState {
       case RELEASE -> to(AVAILABLE, EnumSet.of(RESERVED));
       case END_USE -> to(AVAILABLE, EnumSet.of(IN_USE));
       case RETURN_TO_SERVICE -> to(AVAILABLE, EnumSet.of(MAINTENANCE));
-      case END_USE_FOR_REPAIR -> throw new UnsupportedOperationException("KAN-733");
+      case END_USE_FOR_REPAIR -> to(MAINTENANCE, EnumSet.of(IN_USE));
     };
   }
 
