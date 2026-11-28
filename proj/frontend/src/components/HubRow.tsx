@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ApiError } from "../api/client";
 import { changeCapacity, type Hub } from "../api/fleet";
 import { CAPACITY_BELOW_HELD, CAPACITY_MESSAGE, parseNumber } from "../pages/fleetLabels";
@@ -16,8 +16,14 @@ export function HubRow({ hub, token, onChanged }: HubRowProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Show the saved capacity again when the list is reloaded.
-  useEffect(() => setCapacity(String(hub.capacity)), [hub.capacity]);
+  // Show the saved capacity again when the list is reloaded with a new one. Done while rendering,
+  // not in an effect: an effect also ran on mount and, when it ran late, wrote the saved value back
+  // over what the user had started typing ("10" + "20" became "1020").
+  const [savedCapacity, setSavedCapacity] = useState(hub.capacity);
+  if (hub.capacity !== savedCapacity) {
+    setSavedCapacity(hub.capacity);
+    setCapacity(String(hub.capacity));
+  }
 
   async function save() {
     setBusy(true);
