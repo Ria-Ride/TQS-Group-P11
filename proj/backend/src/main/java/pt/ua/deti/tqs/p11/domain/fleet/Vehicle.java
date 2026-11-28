@@ -214,6 +214,14 @@ public record Vehicle(
   }
 
   /**
+   * BR20: a repaired vehicle goes back to Available at the same hub. Whether another ticket is
+   * still open for it is checked by the caller on the locked vehicle.
+   */
+  public Vehicle returnToService() {
+    return transition(VehicleAction.RETURN_TO_SERVICE, hubId);
+  }
+
+  /**
    * Applies the lifecycle table. The vehicle is at hubAfter if the new state is at a hub, and at no
    * hub otherwise.
    */

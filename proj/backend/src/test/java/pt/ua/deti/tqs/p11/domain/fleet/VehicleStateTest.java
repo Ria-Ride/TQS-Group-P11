@@ -10,6 +10,7 @@ import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RELEASE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.REPORT_FAULT;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RESERVE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RETIRE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RETURN_TO_SERVICE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_MOVE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.START_USE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleState.AVAILABLE;
@@ -53,7 +54,9 @@ class VehicleStateTest {
           arguments(RESERVED, RELEASE, AVAILABLE),
           // BR18: a fault sends an Available or Reserved vehicle to maintenance (US10).
           arguments(AVAILABLE, REPORT_FAULT, MAINTENANCE),
-          arguments(RESERVED, REPORT_FAULT, MAINTENANCE));
+          arguments(RESERVED, REPORT_FAULT, MAINTENANCE),
+          // BR20: the last open ticket of the vehicle is closed (US11).
+          arguments(MAINTENANCE, RETURN_TO_SERVICE, AVAILABLE));
 
   static Stream<Arguments> allowedTransitions() {
     return ALLOWED.stream();

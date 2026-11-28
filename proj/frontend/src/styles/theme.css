@@ -434,3 +434,15 @@ a:hover {
   margin: 0 0 8px;
   font-size: 1.1rem;
 }
+
+/* US11: a ticket past its SLA deadline (BR19). The "Late" label carries the meaning, not the colour
+   alone. */
+.fleet-table tr.late {
+  background: var(--color-error-surface);
+}
+
+.late-label {
+  margin-left: 0.4rem;
+  color: var(--color-error);
+  font-weight: 700;
+}

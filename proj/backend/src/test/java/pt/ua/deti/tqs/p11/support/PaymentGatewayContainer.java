@@ -17,6 +17,14 @@ public final class PaymentGatewayContainer {
   /** How long the gateway holds a tok_timeout answer; keep the backend's read timeout below it. */
   public static final Duration TIMEOUT_DELAY = Duration.ofSeconds(5);
 
+  /**
+   * The backend's read timeout in tests that use this gateway: below {@link #TIMEOUT_DELAY}, so a
+   * tok_timeout charge is still not answered in time, and above how long a gateway that has just
+   * started takes to answer its first requests (over one second on slower machines, which made the
+   * first charges of a run fail with 504).
+   */
+  public static final Duration READ_TIMEOUT = Duration.ofSeconds(3);
+
   private static final int HTTP_PORT = 8080;
   private static final Path SOURCES = Path.of("..", "payment-gateway");
 

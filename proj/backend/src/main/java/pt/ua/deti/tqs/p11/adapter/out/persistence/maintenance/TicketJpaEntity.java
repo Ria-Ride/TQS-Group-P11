@@ -47,6 +47,13 @@ class TicketJpaEntity {
   @Column(name = "technician_id")
   private UUID technicianId;
 
+  /** US11: set when, and only when, the ticket is Closed. */
+  @Column(name = "closed_at")
+  private Instant closedAt;
+
+  @Column(name = "work_done", length = 1000)
+  private String workDone;
+
   /** For JPA only. */
   protected TicketJpaEntity() {}
 
@@ -61,6 +68,8 @@ class TicketJpaEntity {
     entity.slaDeadline = ticket.slaDeadline();
     entity.openedBy = ticket.openedByOperator().orElse(null);
     entity.technicianId = ticket.assignedTechnician().orElse(null);
+    entity.closedAt = ticket.closedAt();
+    entity.workDone = ticket.workDone();
     return entity;
   }
 
@@ -74,6 +83,8 @@ class TicketJpaEntity {
         openedAt,
         slaDeadline,
         openedBy,
-        technicianId);
+        technicianId,
+        closedAt,
+        workDone);
   }
 }
