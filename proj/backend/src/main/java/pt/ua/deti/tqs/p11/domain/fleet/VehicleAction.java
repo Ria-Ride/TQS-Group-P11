@@ -17,5 +17,6 @@ public enum VehicleAction {
   RELEASE,
   END_USE,
   REPORT_FAULT,
-  RETURN_TO_SERVICE
+  RETURN_TO_SERVICE,
+  END_USE_FOR_REPAIR
 }

@@ -125,3 +125,20 @@ Feature: End a ride at a hub and pay any overtime from the deposit (US06)
       | 30   | 2.00   |
       | 35   | 2.00   |
       | 36   | 4.00   |
+
+  # ---------------------------------------------------------------- a fault during the ride (KAN-733)
+
+  # US10: a fault during a ride does not interrupt it (BR18). When the ride ends, the vehicle goes to
+  # Maintenance instead of Available, so it is not offered with an open ticket (domain model:
+  # InUse -> Maintenance), and returns to service when its last ticket is closed (US11).
+  @BR18
+  Scenario: A ride that ends with an open fault ticket sends the vehicle to maintenance
+    Given the simulator has reported fault "BRAKE_WEAR" for "bike-0001" at "2026-11-20T10:00:00Z"
+    And vehicle "bike-0001" is "InUse"
+    When it is 0 minutes late
+    And "Ana" ends the ride at hub "hub-05"
+    Then the ride has ended at hub "hub-05"
+    And vehicle "bike-0001" is "Maintenance" at hub "hub-05"
+    And vehicle "bike-0001" has these open tickets:
+      | fault      | state |
+      | BRAKE_WEAR | Open  |

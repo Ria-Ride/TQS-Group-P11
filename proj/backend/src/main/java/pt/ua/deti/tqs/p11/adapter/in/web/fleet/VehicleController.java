@@ -73,6 +73,7 @@ class VehicleController {
           case RETURN_TO_SERVICE ->
               throw new InvalidFieldException(
                   "action", "happens when the vehicle's last open ticket is closed");
+          case END_USE_FOR_REPAIR -> throw new UnsupportedOperationException("KAN-733");
         };
     return VehicleResponse.from(vehicle);
   }

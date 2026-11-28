@@ -213,6 +213,15 @@ public record Vehicle(
   }
 
   /**
+   * BR18: the ride ends while a fault ticket of the vehicle is open, so it is left at the hub in
+   * Maintenance instead of being offered again. Whether a ticket is open, and whether the hub has a
+   * free slot (BR14), are checked by the caller.
+   */
+  public Vehicle endUseForRepair(UUID hubId) {
+    throw new UnsupportedOperationException("KAN-733");
+  }
+
+  /**
    * BR18: a fault sends an Available or Reserved vehicle to maintenance, at the same hub. In any
    * other state the vehicle is kept as it is: an InUse ride is not interrupted, and a vehicle that
    * is not offered stays out of service. The fault itself is recorded by its ticket.
