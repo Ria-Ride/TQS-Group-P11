@@ -182,6 +182,23 @@ class VehicleTest {
     assertThat(vehicle.reportFault()).isEqualTo(vehicle);
   }
 
+  // ------------------------------------------------------------- back to service (US11)
+
+  @Test
+  void returnToService_vehicleInMaintenance_isAvailableAtTheSameHub() {
+    Vehicle repaired = registeredAtHub03().activate().reportFault().returnToService();
+
+    assertThat(repaired.state()).isEqualTo(VehicleState.AVAILABLE);
+    assertThat(repaired.currentHub()).contains(HUB_03);
+  }
+
+  @Test
+  void returnToService_vehicleNotInMaintenance_isRefused() {
+    Vehicle available = registeredAtHub03().activate();
+
+    assertThatThrownBy(available::returnToService).isInstanceOf(ForbiddenTransitionException.class);
+  }
+
   @ParameterizedTest
   @EnumSource(names = {"DEACTIVATED", "AVAILABLE", "RESERVED", "MAINTENANCE"})
   void new_stateAtAHubWithoutAHub_isRejected(VehicleState state) {

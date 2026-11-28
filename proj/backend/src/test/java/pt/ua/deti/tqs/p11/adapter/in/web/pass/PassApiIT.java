@@ -54,7 +54,7 @@ class PassApiIT {
   static void gateway(DynamicPropertyRegistry registry) {
     GATEWAY.start();
     registry.add("app.payment.base-url", GATEWAY::baseUrl);
-    registry.add("app.payment.read-timeout", () -> "PT1S");
+    registry.add("app.payment.read-timeout", () -> PaymentGatewayContainer.READ_TIMEOUT.toString());
   }
 
   @Value("${local.server.port}")

@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { assignTicket, listOpenTickets, listTechnicians, openTicket } from "./maintenance";
+import {
+  assignTicket,
+  closeTicket,
+  listMyTickets,
+  listOpenTickets,
+  listTechnicians,
+  openTicket,
+  startTicket,
+} from "./maintenance";
 
 const TICKET_ID = "00000000-0000-0000-0000-000000000501";
 const VEHICLE_ID = "3c4d5e6f-0000-4000-8000-000000000009";
@@ -81,6 +89,39 @@ describe("maintenance API", () => {
       method: "GET",
       body: undefined,
       authorization: "Bearer op-token",
+    });
+  });
+
+  it("lists the caller's own tickets", async () => {
+    await listMyTickets("tech-token");
+
+    expect(sentRequest()).toEqual({
+      url: "/api/tickets/mine",
+      method: "GET",
+      body: undefined,
+      authorization: "Bearer tech-token",
+    });
+  });
+
+  it("starts the work on a ticket", async () => {
+    await startTicket(TICKET_ID, "tech-token");
+
+    expect(sentRequest()).toEqual({
+      url: `/api/tickets/${TICKET_ID}/start`,
+      method: "POST",
+      body: {},
+      authorization: "Bearer tech-token",
+    });
+  });
+
+  it("closes a ticket with the work done", async () => {
+    await closeTicket(TICKET_ID, "Replaced brake pads", "tech-token");
+
+    expect(sentRequest()).toEqual({
+      url: `/api/tickets/${TICKET_ID}/close`,
+      method: "POST",
+      body: { workDone: "Replaced brake pads" },
+      authorization: "Bearer tech-token",
     });
   });
 });

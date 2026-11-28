@@ -6,11 +6,13 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import pt.ua.deti.tqs.p11.application.TransactionRunner;
+import pt.ua.deti.tqs.p11.application.fleet.HubRepository;
 import pt.ua.deti.tqs.p11.application.fleet.OpenTickets;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleRepository;
 import pt.ua.deti.tqs.p11.application.fleet.VehicleStateChangeRepository;
 import pt.ua.deti.tqs.p11.application.maintenance.FaultBookingCancellation;
 import pt.ua.deti.tqs.p11.application.maintenance.OpenFaultTicketUseCase;
+import pt.ua.deti.tqs.p11.application.maintenance.TechnicianTicketsUseCase;
 import pt.ua.deti.tqs.p11.application.maintenance.TicketManagementUseCase;
 import pt.ua.deti.tqs.p11.application.maintenance.TicketRepository;
 import pt.ua.deti.tqs.p11.application.user.UserRepository;
@@ -36,6 +38,17 @@ class MaintenanceConfiguration {
       Clock clock) {
     return new OpenFaultTicketUseCase(
         tickets, vehicles, history, bookings, properties.sla(), clock, UUID::randomUUID);
+  }
+
+  @Bean
+  TechnicianTicketsUseCase technicianTicketsUseCase(
+      TicketRepository tickets,
+      VehicleRepository vehicles,
+      HubRepository hubs,
+      VehicleStateChangeRepository history,
+      TransactionRunner transactions,
+      Clock clock) {
+    return new TechnicianTicketsUseCase(tickets, vehicles, hubs, history, transactions, clock);
   }
 
   @Bean

@@ -69,6 +69,10 @@ class VehicleController {
           case REPORT_FAULT ->
               throw new InvalidFieldException(
                   "action", "is reported by telemetry or a maintenance ticket, not by an operator");
+          // BR20: a vehicle leaves Maintenance when its last open ticket is closed (US11).
+          case RETURN_TO_SERVICE ->
+              throw new InvalidFieldException(
+                  "action", "happens when the vehicle's last open ticket is closed");
         };
     return VehicleResponse.from(vehicle);
   }

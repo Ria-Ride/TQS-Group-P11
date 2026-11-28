@@ -33,10 +33,10 @@ import pt.ua.deti.tqs.p11.support.ApiClient.Registered;
 import pt.ua.deti.tqs.p11.support.FleetApi;
 
 /**
- * Steps for US10 (KAN-62), run against the real API, database and MQTT broker. Ticket states are
- * written as in the Product Specs (InProgress) and read as in the API (IN_PROGRESS). A fault
- * reading is waited for until the vehicle has applied it; the ticket is opened in the same
- * transaction, so after that its outcome is final, also when nothing was opened.
+ * Steps for US10 (KAN-62) and US11 (KAN-63), run against the real API, database and MQTT broker.
+ * Ticket states are written as in the Product Specs (InProgress) and read as in the API
+ * (IN_PROGRESS). A fault reading is waited for until the vehicle has applied it; the ticket is
+ * opened in the same transaction, so after that its outcome is final, also when nothing was opened.
  */
 public class MaintenanceSteps {
 
@@ -51,6 +51,8 @@ public class MaintenanceSteps {
   private RestClient http;
   private FleetApi operator;
   private ResponseEntity<Map<String, Object>> lastResponse;
+  private final Map<String, FleetApi> technicians = new HashMap<>();
+  private List<Map<String, Object>> technicianList;
 
   /** Runs before the hooks that delete vehicles and users, because tickets point to them. */
   @Before(order = 9000)
@@ -215,5 +217,182 @@ public class MaintenanceSteps {
               throw new IllegalArgumentException("Outcome is accepted or refused: " + outcome);
         };
     assertThat(lastResponse.getStatusCode()).isEqualTo(expected);
+  }
+
+  // ------------------------------------------------------------- field technicians (US11)
+
+  /** Any ticket of the vehicle for the fault, open or not, the latest first. */
+  private UUID ticketId(String fault, String vehicleCode) {
+    return jdbc.queryForObject(
+        "SELECT t.id FROM maintenance_tickets t JOIN vehicles v ON v.id = t.vehicle_id"
+            + " WHERE v.code = ? AND t.fault_code = ? ORDER BY t.opened_at DESC LIMIT 1",
+        UUID.class,
+        vehicleCode,
+        fault);
+  }
+
+  private UUID accountId(String email) {
+    return jdbc.queryForObject("SELECT id FROM users WHERE email = ?", UUID.class, email);
+  }
+
+  private FleetApi technician(String email) {
+    FleetApi technician = technicians.get(email);
+    if (technician == null) {
+      throw new IllegalStateException("Field technician " + email + " is not logged in");
+    }
+    return technician;
+  }
+
+  private ResponseEntity<Map<String, Object>> start(String email, String fault, String vehicle) {
+    return technician(email)
+        .send(HttpMethod.POST, "/tickets/" + ticketId(fault, vehicle) + "/start", Map.of());
+  }
+
+  private void assignTo(String fault, String vehicleCode, String email) {
+    lastResponse =
+        operator()
+            .send(
+                HttpMethod.PATCH,
+                "/tickets/" + openTicket(vehicleCode, fault).get("id") + "/assignee",
+                Map.of("technicianId", accountId(email)));
+  }
+
+  @Given("field technician {string} is logged in")
+  public void fieldTechnicianIsLoggedIn(String email) {
+    String name = email.substring(0, email.indexOf('@'));
+    Registered account = ApiClient.registerGuest(http, name, email, PASSWORD);
+    jdbc.update(
+        "UPDATE users SET role = 'OPERATOR', field_technician = TRUE WHERE id = ?", account.id());
+    technicians.put(email, new FleetApi(http, account.token()));
+  }
+
+  @Given("the ticket for fault {string} of vehicle {string} is assigned to {string}")
+  public void theTicketIsAssignedTo(String fault, String vehicleCode, String email) {
+    assignTo(fault, vehicleCode, email);
+    assertThat(lastResponse.getStatusCode()).as("setup: assignment").isEqualTo(HttpStatus.OK);
+  }
+
+  /** Moves the opening and the deadline back, so a scenario does not wait for the clock. */
+  @Given("the ticket for fault {string} of vehicle {string} was opened {int} hours ago")
+  public void theTicketWasOpenedHoursAgo(String fault, String vehicleCode, int hours) {
+    jdbc.update(
+        "UPDATE maintenance_tickets SET opened_at = opened_at - make_interval(hours => ?),"
+            + " sla_deadline = sla_deadline - make_interval(hours => ?) WHERE id = ?",
+        hours,
+        hours,
+        ticketId(fault, vehicleCode));
+  }
+
+  @Given("{string} has started the ticket for fault {string} of vehicle {string}")
+  public void hasStartedTheTicket(String email, String fault, String vehicleCode) {
+    assertThat(start(email, fault, vehicleCode).getStatusCode())
+        .as("setup: start")
+        .isEqualTo(HttpStatus.OK);
+  }
+
+  @When("{string} looks at their tickets")
+  public void looksAtTheirTickets(String email) {
+    technicianList = technician(email).getList("/tickets/mine").getBody();
+  }
+
+  @When("{string} starts the ticket for fault {string} of vehicle {string}")
+  public void startsTheTicket(String email, String fault, String vehicleCode) {
+    lastResponse = start(email, fault, vehicleCode);
+  }
+
+  @When("{string} closes the ticket for fault {string} of vehicle {string} recording {string}")
+  public void closesTheTicket(String email, String fault, String vehicleCode, String workDone) {
+    Map<String, Object> body = new HashMap<>();
+    body.put("workDone", workDone);
+    lastResponse =
+        technician(email)
+            .send(HttpMethod.POST, "/tickets/" + ticketId(fault, vehicleCode) + "/close", body);
+  }
+
+  /** The location of a ticket is the code of the hub its vehicle is at. */
+  @Then("they see these tickets, in order:")
+  public void theySeeTheseTicketsInOrder(DataTable expected) {
+    Tuple[] tickets =
+        expected.asMaps().stream()
+            .map(row ->
+                tuple(
+                    row.get("vehicle"),
+                    row.get("fault"),
+                    row.get("location"),
+                    "yes".equals(row.get("breached"))))
+            .toArray(Tuple[]::new);
+
+    assertThat(technicianList)
+        .extracting(
+            ticket -> ticket.get("vehicleCode"),
+            ticket -> ticket.get("faultCode"),
+            ticket -> ticket.get("hubCode"),
+            ticket -> ticket.get("breached"))
+        .containsExactly(tickets);
+  }
+
+  // Exact sentences, not "{}": US04 has "the start is refused because {}" for a ride.
+
+  @Then("starting the ticket is refused because it is not theirs")
+  public void startingIsRefusedAsNotTheirs() {
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+  }
+
+  @Then("the closing is accepted")
+  public void theClosingIsAccepted() {
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+  }
+
+  @Then("the closing is refused because the work done is empty")
+  public void theClosingIsRefusedAsEmpty() {
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(errors(lastResponse)).containsKey("workDone");
+  }
+
+  @Then("the closing is refused because the work has not started")
+  public void theClosingIsRefusedAsNotStarted() {
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(errors(lastResponse)).containsKey("state");
+  }
+
+  @Then("the closing is refused because the ticket is not theirs")
+  public void theClosingIsRefusedAsNotTheirs() {
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+  }
+
+  @Then("the ticket for fault {string} of vehicle {string} is {string}")
+  public void theTicketIs(String fault, String vehicleCode, String state) {
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT state FROM maintenance_tickets WHERE id = ?",
+                String.class,
+                ticketId(fault, vehicleCode)))
+        .isEqualTo(apiState(state));
+  }
+
+  /** BR19, as the API reported it when the ticket was closed. */
+  @Then("the ticket for fault {string} of vehicle {string} was closed on time")
+  public void theTicketWasClosedOnTime(String fault, String vehicleCode) {
+    assertClosedBreached(fault, vehicleCode, false);
+  }
+
+  @Then("the ticket for fault {string} of vehicle {string} was closed after its deadline")
+  public void theTicketWasClosedLate(String fault, String vehicleCode) {
+    assertClosedBreached(fault, vehicleCode, true);
+  }
+
+  private void assertClosedBreached(String fault, String vehicleCode, boolean breached) {
+    assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(lastResponse.getBody())
+        .containsEntry("id", ticketId(fault, vehicleCode).toString())
+        .containsEntry("breached", breached);
+  }
+
+  /** A few minutes of slack: the scenario itself takes some time after moving the opening back. */
+  @Then("its time to repair is about {int} hours")
+  public void itsTimeToRepairIsAbout(int hours) {
+    long minutes = ((Number) lastResponse.getBody().get("timeToRepairMinutes")).longValue();
+
+    assertThat(minutes).isBetween(hours * 60L, hours * 60L + 5);
   }
 }

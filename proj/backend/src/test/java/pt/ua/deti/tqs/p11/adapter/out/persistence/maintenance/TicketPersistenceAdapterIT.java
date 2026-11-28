@@ -62,7 +62,9 @@ class TicketPersistenceAdapterIT {
     return MaintenanceTicket.openFromFault(UUID.randomUUID(), VEHICLE_ID, fault, OPENED_AT, SLA);
   }
 
+  /** A Closed ticket has its closing time and work done (US11); a Cancelled one has neither. */
   private static MaintenanceTicket finished(TicketState state, FaultCode fault) {
+    boolean closed = state == TicketState.CLOSED;
     return new MaintenanceTicket(
         UUID.randomUUID(),
         VEHICLE_ID,
@@ -72,7 +74,9 @@ class TicketPersistenceAdapterIT {
         OPENED_AT,
         OPENED_AT.plus(SLA),
         null,
-        TECHNICIAN_ID);
+        TECHNICIAN_ID,
+        closed ? OPENED_AT.plus(Duration.ofHours(2)) : null,
+        closed ? "Replaced brake pads" : null);
   }
 
   private static User technician() {
@@ -170,6 +174,24 @@ class TicketPersistenceAdapterIT {
     tickets.save(ticket);
 
     assertThat(tickets.findById(ticket.id())).contains(ticket);
+  }
+
+  /** US11: a closed ticket keeps when it was closed and the work done (time to repair, BR19). */
+  @Test
+  void findById_closedTicket_keepsTheClosingTimeAndTheWorkDone() {
+    MaintenanceTicket closed = finished(TicketState.CLOSED, BRAKE_WEAR);
+    tickets.save(closed);
+
+    assertThat(tickets.findById(closed.id())).contains(closed);
+  }
+
+  /** A Closed ticket needs both, also for rows edited by hand. */
+  @Test
+  void database_refusesAClosedTicketWithoutClosingTimeOrWork() {
+    Instant deadline = OPENED_AT.plus(SLA);
+
+    assertThatThrownBy(() -> insertRow("CLOSED", deadline, TECHNICIAN_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
@@ -280,6 +302,49 @@ class TicketPersistenceAdapterIT {
     assertThat(tickets.findOpen())
         .filteredOn(ticket -> ticket.vehicleId().equals(VEHICLE_ID))
         .containsExactly(sooner, later);
+  }
+
+  // ------------------------------------------------------------- a technician's tickets (US11)
+
+  /**
+   * BR19: the technician's most urgent ticket first. Tickets of another technician, not assigned
+   * yet, or finished are not theirs to work on.
+   */
+  @Test
+  void findOpenAssignedTo_listsTheTechniciansOpenTicketsNearestDeadlineFirst() {
+    UUID otherId = UUID.fromString("5e6f7a8b-0000-4000-8000-000000000302");
+    jdbc.update(
+        "INSERT INTO users (id, name, email, password_hash, role, field_technician)"
+            + " VALUES (?, 'Ana Matos', 'ticket.other.it@example.com', 'x', 'OPERATOR', TRUE)",
+        otherId);
+    User other =
+        User.account(
+            otherId,
+            "Ana Matos",
+            new EmailAddress("ticket.other.it@example.com"),
+            "x",
+            Role.OPERATOR,
+            true);
+    MaintenanceTicket later = fromFault(BRAKE_WEAR).assignTo(technician());
+    MaintenanceTicket sooner =
+        MaintenanceTicket.openFromFault(
+                UUID.randomUUID(), VEHICLE_ID, LOW_TYRE_PRESSURE, OPENED_AT.minusSeconds(3600), SLA)
+            .assignTo(technician())
+            .start(TECHNICIAN_ID);
+    tickets.save(later);
+    tickets.save(sooner);
+    tickets.save(fromFault(FaultCode.of("FLAT_TIRE")).assignTo(other));
+    tickets.save(fromFault(FaultCode.of("BATTERY_OVERHEAT")));
+    tickets.save(finished(TicketState.CLOSED, FaultCode.of("BROKEN_BASKET")));
+
+    assertThat(tickets.findOpenAssignedTo(TECHNICIAN_ID)).containsExactly(sooner, later);
+  }
+
+  @Test
+  void findOpenAssignedTo_technicianWithoutTickets_isEmpty() {
+    tickets.save(fromFault(BRAKE_WEAR));
+
+    assertThat(tickets.findOpenAssignedTo(TECHNICIAN_ID)).isEmpty();
   }
 
   @Test

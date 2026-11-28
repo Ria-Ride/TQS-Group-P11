@@ -148,6 +148,38 @@ describe("home page", () => {
     );
   });
 
+  it("offers their tickets to a field technician", async () => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Tiago Lopes",
+      email: "tiago.lopes@example.com",
+      role: "OPERATOR",
+      fieldTechnician: true,
+    });
+    renderApp("/");
+
+    expect(await screen.findByRole("link", { name: "My tickets" })).toHaveAttribute(
+      "href",
+      "/technician/tickets",
+    );
+  });
+
+  it("does not offer technician tickets to an operator who is not a field technician", async () => {
+    saveSession(session);
+    vi.mocked(getProfile).mockResolvedValue({
+      id: session.userId,
+      name: "Rui Costa",
+      email: "rui.costa@example.com",
+      role: "OPERATOR",
+      fieldTechnician: false,
+    });
+    renderApp("/");
+
+    await screen.findByRole("heading", { name: "Hello, Rui Costa" });
+    expect(screen.queryByRole("link", { name: "My tickets" })).not.toBeInTheDocument();
+  });
+
   it("does not offer the maintenance tickets to a tourist", async () => {
     saveSession(session);
     vi.mocked(getProfile).mockResolvedValue({

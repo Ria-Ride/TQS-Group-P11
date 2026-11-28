@@ -45,6 +45,7 @@ import pt.ua.deti.tqs.p11.domain.fleet.ForbiddenTransitionException;
 import pt.ua.deti.tqs.p11.domain.fleet.HubFullException;
 import pt.ua.deti.tqs.p11.domain.maintenance.ForbiddenTicketTransitionException;
 import pt.ua.deti.tqs.p11.domain.maintenance.NotAFieldTechnicianException;
+import pt.ua.deti.tqs.p11.domain.maintenance.NotTheAssignedTechnicianException;
 import pt.ua.deti.tqs.p11.domain.pass.StayCodeLinkedToAnotherAccountException;
 import pt.ua.deti.tqs.p11.domain.pass.StayCodeNotValidTodayException;
 import pt.ua.deti.tqs.p11.domain.user.FieldTechnicianRequiresOperatorException;
@@ -389,5 +390,11 @@ class ApiExceptionHandler {
   @ExceptionHandler(ForbiddenTicketTransitionException.class)
   ProblemDetail ticketTransitionRefused(ForbiddenTicketTransitionException e) {
     return problem(HttpStatus.CONFLICT, e.getMessage(), Map.of("state", e.getMessage()));
+  }
+
+  /** BR20: only the assigned technician starts or closes a ticket. */
+  @ExceptionHandler(NotTheAssignedTechnicianException.class)
+  ProblemDetail notTheAssignedTechnician(NotTheAssignedTechnicianException e) {
+    return problem(HttpStatus.FORBIDDEN, "This ticket is assigned to another technician", Map.of());
   }
 }

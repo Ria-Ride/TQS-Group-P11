@@ -16,8 +16,8 @@ import pt.ua.deti.tqs.p11.support.ShiftableClock;
 /**
  * Starts the whole application on a random port with a real PostgreSQL, a real MQTT broker and the
  * simulated payment gateway for the scenarios. The telemetry adapter is on (US09); the broker and
- * the gateway are shared by all scenarios. The payment read timeout is short, so the timed-out
- * payment scenario (US03) takes one second.
+ * the gateway are shared by all scenarios. The payment read timeout is short
+ * (PaymentGatewayContainer.READ_TIMEOUT), so a timed-out payment scenario takes a few seconds.
  *
  * <p>The platform clock is a {@link ShiftableClock}: real time unless a scenario fixes it (US05,
  * US06). The scheduled expiry of reservations is off, so only the steps decide when it runs.
@@ -47,7 +47,7 @@ public class CucumberSpringConfiguration {
   static void gatewayAddress(DynamicPropertyRegistry registry) {
     GATEWAY.start();
     registry.add("app.payment.base-url", GATEWAY::baseUrl);
-    registry.add("app.payment.read-timeout", () -> "PT1S");
+    registry.add("app.payment.read-timeout", () -> PaymentGatewayContainer.READ_TIMEOUT.toString());
   }
 
   /** Replaces the system clock of AuthConfiguration for every bean that takes a Clock. */

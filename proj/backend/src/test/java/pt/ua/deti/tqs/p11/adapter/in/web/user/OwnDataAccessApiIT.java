@@ -61,7 +61,21 @@ class OwnDataAccessApiIT {
         .containsEntry("name", "Ana Sousa")
         .containsEntry("email", "ana.sousa@example.com")
         .containsEntry("role", "END_USER")
+        .containsEntry("fieldTechnician", false)
         .doesNotContainKey("passwordHash");
+  }
+
+  /** US11: the UI offers "My tickets" only to field technicians. */
+  @Test
+  void ownData_ofAFieldTechnician_saysSo() {
+    jdbc.update(
+        "UPDATE users SET role = 'OPERATOR', field_technician = TRUE WHERE id = ?", ana.id());
+
+    ResponseEntity<Map<String, Object>> response = getUser(ana.id(), ana.token());
+
+    assertThat(response.getBody())
+        .containsEntry("role", "OPERATOR")
+        .containsEntry("fieldTechnician", true);
   }
 
   @Test
