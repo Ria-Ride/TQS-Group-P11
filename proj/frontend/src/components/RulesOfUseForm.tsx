@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { changeRules, type RulesOfUse } from "../api/backoffice";
 import { ApiError, type FieldErrors } from "../api/client";
 import type { VehicleType } from "../api/fleet";
@@ -61,8 +61,13 @@ export function RulesOfUseForm({ rules, versions, token, onSaved }: RulesOfUseFo
   const [saved, setSaved] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Show the saved values again when the rules are reloaded.
-  useEffect(() => setValues(valuesOf(rules)), [rules]);
+  // Show the saved values again when the rules are reloaded. Done while rendering, not in an
+  // effect: an effect could run late, after the user started typing, and overwrite the inputs.
+  const [shown, setShown] = useState(rules);
+  if (shown !== rules) {
+    setShown(rules);
+    setValues(valuesOf(rules));
+  }
 
   function set(field: keyof Omit<Values, "rates">, value: string) {
     setValues((current) => ({ ...current, [field]: value }));

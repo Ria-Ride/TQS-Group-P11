@@ -271,10 +271,10 @@ A vehicle is **bookable** only in Available (BR2), and then only if its battery 
 | Available | InUse | User starts an immediate booking | Battery at or above the minimum, checked in the atomic state change; rules of use satisfied |
 | Reserved | InUse | User starts the booking | Within the booking's start window; only the booking that reserved the vehicle |
 | Reserved | Available | User or operator cancels, or the start window passes | Deposit released |
-| InUse | Available | User ends the booking at a hub | Hub has a free slot, vehicle locked. If the hub is full the end is refused, the vehicle stays InUse and the time of the first refusal is recorded on the booking |
+| InUse | Available | User ends the booking at a hub | No open maintenance ticket; hub has a free slot, vehicle locked. If the hub is full the end is refused, the vehicle stays InUse and the time of the first refusal is recorded on the booking |
 | Available | Maintenance | A fault reading arrives, or an operator opens a manual ticket and sends the vehicle to maintenance | A ticket is opened |
 | Reserved | Maintenance | A fault reading arrives | The booking is cancelled (reason "vehicle fault") and its deposit released |
-| InUse | Maintenance | User ends the booking | A fault is open; the ride is not interrupted |
+| InUse | Maintenance | User ends the booking at a hub | A maintenance ticket is open (a fault reported during the ride does not interrupt it); hub has a free slot, vehicle locked. The vehicle stays at that hub, and the ticket is not changed |
 | Maintenance | Available | A technician closes a ticket, or a ticket is cancelled | No other ticket is open for the vehicle |
 | Available | InTransit | Operator starts moving the vehicle to another hub | No active booking |
 | InTransit | Available | Operator confirms arrival | Destination hub has a free slot |

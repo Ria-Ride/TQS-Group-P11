@@ -143,8 +143,9 @@ public class VehicleLifecycleUseCase {
 
   /**
    * US06: a ride ends at a hub, as one atomic change (K3): the vehicle is locked, {@code check}
-   * runs on it (the booking is completed there), it goes from InUse to Available at that hub, and
-   * the hub is locked to count its free slot (BR14), vehicle before hub as always.
+   * runs on it (the booking is completed there), it goes from InUse to Available at that hub, or to
+   * Maintenance there if a ticket of the vehicle is still open (BR18), and the hub is locked to
+   * count its free slot (BR14), vehicle before hub as always.
    *
    * @throws pt.ua.deti.tqs.p11.domain.fleet.HubFullException if the hub has no free slot
    */
@@ -154,7 +155,11 @@ public class VehicleLifecycleUseCase {
         vehicleId,
         check,
         vehicle -> {
-          Vehicle ended = vehicle.endUse(hubId);
+          // BR18: with a ticket still open the vehicle is not offered again.
+          Vehicle ended =
+              openTickets.existFor(vehicleId)
+                  ? vehicle.endUseForRepair(hubId)
+                  : vehicle.endUse(hubId);
           lockHubWithFreeSlot(hubId);
           return ended;
         });

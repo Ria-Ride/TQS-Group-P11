@@ -7,6 +7,7 @@ import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.ACTIVATE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.CONFIRM_ARRIVAL;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.DEACTIVATE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.END_USE;
+import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.END_USE_FOR_REPAIR;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RELEASE;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.REPORT_FAULT;
 import static pt.ua.deti.tqs.p11.domain.fleet.VehicleAction.RESERVE;
@@ -59,7 +60,9 @@ class VehicleStateTest {
           arguments(AVAILABLE, REPORT_FAULT, MAINTENANCE),
           arguments(RESERVED, REPORT_FAULT, MAINTENANCE),
           // BR20: the last open ticket of the vehicle is closed (US11).
-          arguments(MAINTENANCE, RETURN_TO_SERVICE, AVAILABLE));
+          arguments(MAINTENANCE, RETURN_TO_SERVICE, AVAILABLE),
+          // BR18: a ride ends while a fault ticket is open (KAN-733).
+          arguments(IN_USE, END_USE_FOR_REPAIR, MAINTENANCE));
 
   static Stream<Arguments> allowedTransitions() {
     return ALLOWED.stream();

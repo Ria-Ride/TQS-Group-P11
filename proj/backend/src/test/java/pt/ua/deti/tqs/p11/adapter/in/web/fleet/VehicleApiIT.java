@@ -356,6 +356,18 @@ class VehicleApiIT {
     assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "AVAILABLE");
   }
 
+  /** BR18 (KAN-733): only the end of a ride sends it to Maintenance, never an operator. */
+  @Test
+  void transition_endUseForRepair_returns400OnTheActionAndChangesNothing() {
+    UUID bike = availableBike();
+
+    ResponseEntity<Map<String, Object>> response = operator.transition(bike, "END_USE_FOR_REPAIR");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(errors(response)).containsOnlyKeys("action");
+    assertThat(operator.get("/vehicles/" + bike).getBody()).containsEntry("state", "AVAILABLE");
+  }
+
   @Test
   void transition_unknownVehicle_returns404() {
     ResponseEntity<Map<String, Object>> response =

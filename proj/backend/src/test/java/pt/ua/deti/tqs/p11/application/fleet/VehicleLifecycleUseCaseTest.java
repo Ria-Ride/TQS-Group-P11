@@ -448,6 +448,26 @@ class VehicleLifecycleUseCaseTest {
         .save(new VehicleStateChange(BIKE_ID, VehicleState.IN_USE, VehicleState.AVAILABLE, T0));
   }
 
+  /**
+   * BR18 (KAN-733): a fault reported during the ride left a ticket open, so the vehicle stays out
+   * of service at the hub instead of being offered; one change is recorded, InUse to Maintenance.
+   */
+  @Test
+  void endUse_withAnOpenTicket_leavesTheVehicleInMaintenanceThereAndRecordsIt() {
+    when(vehicles.findByIdForUpdate(BIKE_ID)).thenReturn(Optional.of(bikeInUse()));
+    when(openTickets.existFor(BIKE_ID)).thenReturn(true);
+    when(hubs.findByIdForUpdate(HUB_05_ID)).thenReturn(Optional.of(HUB_05));
+    when(vehicles.countAtHub(HUB_05_ID)).thenReturn(0);
+    when(vehicles.save(any())).then(returnsFirstArg());
+
+    Vehicle vehicle = useCase.endUse(BIKE_ID, HUB_05_ID, locked -> {});
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.MAINTENANCE);
+    assertThat(vehicle.currentHub()).contains(HUB_05_ID);
+    verify(history)
+        .save(new VehicleStateChange(BIKE_ID, VehicleState.IN_USE, VehicleState.MAINTENANCE, T0));
+  }
+
   /** BR14: the slot is counted with the hub locked, so two ends cannot take the last one. */
   @Test
   void endUse_fullHub_isRefusedAndNothingIsSaved() {

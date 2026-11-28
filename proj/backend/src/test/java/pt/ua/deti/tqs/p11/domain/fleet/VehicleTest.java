@@ -151,6 +151,25 @@ class VehicleTest {
     assertThat(vehicle.currentHub()).contains(otherHub);
   }
 
+  /** BR18: a vehicle that reported a fault during the ride is not offered when it ends. */
+  @Test
+  void endUseForRepair_vehicleInUse_isInMaintenanceAtTheHubWhereItEnded() {
+    UUID otherHub = UUID.randomUUID();
+
+    Vehicle vehicle = registeredAtHub03().activate().startUse().endUseForRepair(otherHub);
+
+    assertThat(vehicle.state()).isEqualTo(VehicleState.MAINTENANCE);
+    assertThat(vehicle.currentHub()).contains(otherHub);
+  }
+
+  @Test
+  void endUseForRepair_vehicleNotInUse_isRefused() {
+    Vehicle available = registeredAtHub03().activate();
+
+    assertThatThrownBy(() -> available.endUseForRepair(HUB_03))
+        .isInstanceOf(ForbiddenTransitionException.class);
+  }
+
   @Test
   void endUse_vehicleNotInUse_isRefused() {
     Vehicle available = registeredAtHub03().activate();

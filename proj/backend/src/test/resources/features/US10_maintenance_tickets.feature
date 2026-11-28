@@ -8,8 +8,9 @@ Feature: Maintenance tickets opened from faults or manually, and assigned (US10)
   # The simulator repeats the current fault code in every reading while the fault lasts, so the
   # same fault arrives many times: BR20 keeps one open ticket per vehicle and fault code.
   # A vehicle given "in state" X is registered at hub "hub-03" and brought to X, as in US08.
-  # Bookings (US05) do not exist yet: the scenario that cancels a Reserved booking is tagged @wip
-  # and is not run until US05 (KAN-57) provides them. The vehicle side of it is run now.
+  # The cancellation of the Booking of a Reserved vehicle with a fault, and its deposit, is shown
+  # in US05_future_booking.feature; here, what the fault does to the vehicle. The end of a ride with
+  # an open ticket is in US06_end_use.feature.
   # Closing tickets, breached tickets and the return to Available belong to US11.
 
   Background:
@@ -63,14 +64,6 @@ Feature: Maintenance tickets opened from faults or manually, and assigned (US10)
     Then vehicle "bike-0009" has these open tickets:
       | fault      | state |
       | BRAKE_WEAR | Open  |
-    And vehicle "bike-0009" is "Maintenance"
-
-  @BR18 @wip
-  Scenario: A fault on a Reserved vehicle cancels its booking and releases the deposit
-    Given tourist "ana@example.com" has a Reserved booking of vehicle "bike-0009"
-    When the simulator reports fault "BRAKE_WEAR" for "bike-0009" at "2026-11-10T10:00:00Z"
-    Then the booking of "ana@example.com" is "Cancelled" with reason "vehicle fault"
-    And the deposit of that booking is released
     And vehicle "bike-0009" is "Maintenance"
 
   @BR16 @BR18
