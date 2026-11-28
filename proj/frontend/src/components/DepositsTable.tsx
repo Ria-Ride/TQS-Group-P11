@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { changeDeposit, type VehicleTypeRules } from "../api/backoffice";
 import { ApiError } from "../api/client";
 import { MONEY_MESSAGE } from "../pages/backofficeMessages";
@@ -18,8 +18,13 @@ function DepositRow({ rules, token, onChanged }: DepositRowProps) {
   const [busy, setBusy] = useState(false);
   const label = TYPE_LABELS[rules.type];
 
-  // Show the saved deposit again when the rules are reloaded.
-  useEffect(() => setDeposit(rules.depositAmount), [rules.depositAmount]);
+  // Show the saved deposit again when the rules are reloaded. Done while rendering, not in an
+  // effect: an effect could run late, after the user started typing, and overwrite the input.
+  const [shown, setShown] = useState(rules.depositAmount);
+  if (shown !== rules.depositAmount) {
+    setShown(rules.depositAmount);
+    setDeposit(rules.depositAmount);
+  }
 
   async function save() {
     setBusy(true);
